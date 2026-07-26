@@ -1,0 +1,12 @@
+{
+  "id": "WinrateTracker",
+  "name": "Winrate Tracker",
+  "author": "dkali",
+  "description": "Tracks win rate by character, ascension, and act across your run history.",
+  "version": "v0.1.0",
+  "min_game_version": "0.109.0",
+  "has_pck": false,
+  "has_dll": true,
+  "dependencies": [],
+  "affects_gameplay": false
+}

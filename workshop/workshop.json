@@ -1,0 +1,9 @@
+{
+  "title": "Winrate Tracker",
+  "description": "Tracks win rate by character, ascension, and act across your run history.",
+  "visibility": "private",
+  "changeNote": "Initial release.",
+  "tags": [],
+  "dependencies": [],
+  "contentDescriptors": []
+}
