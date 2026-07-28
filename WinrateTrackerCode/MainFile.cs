@@ -22,6 +22,6 @@ public partial class MainFile : Node
         new Harmony(ModId).PatchAll();
 
         // Keep this string in sync with the manifest version.
-        Logger.Info("Winrate Tracker v0.2.0 initialized.");
+        Logger.Info("Winrate Tracker v0.2.1 initialized.");
     }
 }

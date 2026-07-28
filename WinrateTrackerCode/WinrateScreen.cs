@@ -50,19 +50,48 @@ internal sealed class WinrateScreen : IDisposable
 
     private readonly NStatsScreen _screen;
     private readonly List<NSettingsTab> _tabs = [];
-    private readonly FilterBar _filters;
-    private readonly VBoxContainer _content;
-    private readonly MegaLabel _summary;
+    // Assigned in Build, which the constructor calls inside a try so a failure can tear
+    // the screen back down.
+    private FilterBar _filters = null!;
+    private VBoxContainer _content = null!;
+    private MegaLabel _summary = null!;
 
     private WinrateScreen(NSubmenuStack stack)
     {
         _screen = SceneHelper.Instantiate<NStatsScreen>(StatsScreenScene);
+        try
+        {
+            Build(stack);
+        }
+        catch
+        {
+            // Build parents the screen to the stack partway through. Left there, it would
+            // draw over the Compendium without being on the stack, so nothing could
+            // dismiss it.
+            _screen.QueueFree();
+            throw;
+        }
+    }
 
+    private void Build(NSubmenuStack stack)
+    {
         // Before the tree, so NStatsTabManager._Ready counts four tabs and wires trigger
         // cycling across all of them.
         var tabContainer = _screen.GetNode<Control>("%Tabs").GetNode<Control>("TabContainer");
         for (var i = tabContainer.GetChildCount(); i < TabCount; i++)
             tabContainer.AddChild(SceneHelper.Instantiate<NSettingsTab>(TabScene));
+
+        // Everything that does not need the screen is built first, while nothing is
+        // parented yet. If any of it throws, the stack is left exactly as it was rather
+        // than holding a half-built screen.
+        _filters = new FilterBar();
+        _filters.Changed += Rebuild;
+
+        _summary = NativeStyle.Cell("", rightAligned: false, header: true);
+        _summary.HorizontalAlignment = HorizontalAlignment.Center;
+
+        _content = new VBoxContainer();
+        _content.AddThemeConstantOverride("separation", NativeStyle.SectionSeparation);
 
         stack.AddChild(_screen);
         _screen.SetStack(stack);
@@ -73,23 +102,21 @@ internal sealed class WinrateScreen : IDisposable
         {
             var tab = (ReportTab)i;
             _tabs[i].SetLabel(ReportTables.Title(tab));
-            // The scene's second tab ships disabled because Achievements is not released.
+            // The scene's second tab is the game's unreleased Achievements tab: it ships
+            // disabled, with a greyed label and a padlock over it. All three have to go.
+            // Only the label's tint is reset — the tab's Outline carries the cyan
+            // selection glow, and whitening that would flatten the selected state.
             _tabs[i].Enable();
+            if (_tabs[i].GetNodeOrNull<CanvasItem>("Lock") is { } padlock)
+                padlock.Visible = false;
+            if (_tabs[i].GetNodeOrNull<CanvasItem>("Label") is { } label)
+                label.Modulate = Colors.White;
             _tabs[i].Connect(
                 NClickableControl.SignalName.Released,
                 Callable.From<NClickableControl>(_ => Show(tab)));
         }
 
-        _filters = new FilterBar();
-        _filters.Changed += Rebuild;
-
-        _summary = NativeStyle.Cell("", rightAligned: false, header: true);
-        _summary.HorizontalAlignment = HorizontalAlignment.Center;
-
         _screen.AddChild(BuildFilterRow());
-
-        _content = new VBoxContainer();
-        _content.AddThemeConstantOverride("separation", NativeStyle.SectionSeparation);
         ReplaceNativeContent();
     }
 
@@ -104,7 +131,21 @@ internal sealed class WinrateScreen : IDisposable
         if (_current is null || !_current._screen.IsValid())
         {
             _current?.Dispose();
-            _current = new WinrateScreen(stack);
+            try
+            {
+                _current = new WinrateScreen(stack);
+            }
+            catch (Exception exception)
+            {
+                // Building the screen parents it to the stack partway through. Left
+                // there, a half-built screen draws over the Compendium without being on
+                // the stack, so nothing dismisses it and every further press builds
+                // another one. Tear it down and stay on the Compendium instead.
+                MainFile.Logger.Error($"Could not build the Win Rates screen: {exception}");
+                _current?.Dispose();
+                _current = null;
+                return;
+            }
         }
 
         stack.Push(_current._screen);
@@ -264,7 +305,6 @@ internal sealed class WinrateScreen : IDisposable
     public void Dispose()
     {
         _filters.Changed -= Rebuild;
-        _filters.Dispose();
         if (_screen.IsValid())
         {
             StatsScreenPatch.Forget(_screen);
