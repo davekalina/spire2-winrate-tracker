@@ -18,34 +18,53 @@ pipeline work. Those are platform facts. This file is how I want the work done.
 | Gameplay | Informational only; `affects_gameplay` is `false` |
 | Dependencies | None yet |
 
-**This is a stub.** It loads, logs its version, and does nothing else. There is no
-tracking logic, no persistence, and no UI yet. Keep this section honest: update it as
-behavior lands rather than describing what is planned as though it exists.
+### What it does
 
-### Intent
+Adds a **Win Rates** tile to the Compendium bottom row, opening a four-tab screen —
+Overview, Blocks, Characters, Months — over the player's own run history, narrowed by a
+filter row (ascension, character, abandoned runs).
 
-Record the outcome of every completed run and surface win rate sliced by character,
-ascension level, and how far the run got. The interesting questions are "does my win rate
-with this character actually improve at higher ascension?" and "which act am I losing in?"
+### How it is built, and why
 
-Open design questions, to settle before writing code:
+- **Run outcomes are read, not observed.** The game writes a `.run` file per finished run
+  under the profile's `saves/history`. `RunArchive` reads that directory directly rather
+  than hooking run-end, so runs from before the mod was installed count and there is no
+  state of our own to keep in sync. It also means nothing is persisted: there is no mod
+  save file, and none is wanted.
+- **The files are parsed by hand, not through `SaveManager.LoadRunHistory`.** That path
+  runs save migrations and deserializes the whole run — deck, relics, every per-floor
+  stat block — to answer a question that needs a dozen scalars. `RunParser` reads the raw
+  JSON instead. The archive already spans schema v8 and v9 and the fields it reads have
+  been stable across both.
+- **The screen is a second instance of the native Statistics screen**, contents replaced.
+  It has to be a real `NSubmenu` to go on the submenu stack, and a mod assembly cannot
+  declare one — a subclass of a Godot script type needs a registered script, which only
+  the game's own scenes have. Borrowing the scene also inherits its back button, Escape
+  and controller dismissal, scroll gradient, scrollbar, and trigger tab cycling.
+- **Anything game-independent lives in its own file** and is linked into
+  `WinrateTracker.Tests`: `RunRecord`, `RunParser`, `RunFilter`, `WinrateReport`,
+  `Format`, `ReportTables`. `ReportTables` decides the exact text of every cell, so the
+  whole screen's contents are assertable without launching the game. Keep it that way —
+  when adding a table, add it there, not in the renderer.
 
-- **Where outcomes come from.** A run-end hook, or reading the game's own run history.
-  Prefer whatever the game already records over anything this mod has to observe itself.
-- **Where results live.** `user://winrate-tracker/` as JSON is the obvious answer and
-  matches what Output Tracker does, but consider whether the two mods should share one
-  archive rather than each keeping their own.
-- **Where results are shown.** Main menu, the character-select screen, and the game-over
-  screen are all plausible. Pick one before building three.
-- **What counts as a run.** Abandoned runs, runs where the game crashed, and runs on a
-  different game branch all need an explicit decision.
+Settled decisions worth not relitigating:
+
+- **Co-op runs are always excluded.** A shared win is not the same evidence about your
+  play as a solo one. The screen says so rather than dropping them silently.
+- **Abandoned runs are excluded by default**, because abandoning is a decision to stop,
+  not a loss. The filter row can include them.
+- **Blocks are anchored at the oldest run**, not the newest, so a block always covers the
+  same ten runs and the cumulative column means something.
 
 ### Surfaces to audit
 
-Any directional change must be applied across all of these. This list is empty because
-the mod has no surfaces yet — populate it with the first screen that ships.
+Any directional change must be applied across all of these.
 
-- _none yet_
+- The Compendium tile (`CompendiumTilePatch`) — label, icon, tint, focus neighbours.
+- The filter row (`FilterBar`) — the three paginators and the summary line under them.
+- All four tabs (`ReportTables`) — a wording, rounding, or column change belongs in every
+  table it applies to, not just the one that was reported.
+- The empty and loading states (`WinrateScreen.EmptyMessage`, `SummaryText`).
 
 ## Mod UI: match the game
 

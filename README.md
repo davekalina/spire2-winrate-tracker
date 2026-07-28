@@ -1,17 +1,40 @@
 # Winrate Tracker
 
-An informational Slay the Spire 2 mod that will track win rate by character, ascension
-level, and act reached.
+An informational Slay the Spire 2 mod that reads your own run history and reports how
+often you actually win — rolling and all-time, sliced by run block, character, and month.
 
-## Status: stub
+It adds a **Win Rates** tile to the Compendium, beside Statistics and Run History.
 
-v0.1.0 loads, logs `Winrate Tracker v0.1.0 initialized`, and does nothing else. There is
-no tracking logic, no persistence, and no UI. It exists so the repository, build,
-install, and Workshop pipeline are all proven before any behavior is written.
+## The screen
 
-See the **Intent** section of [`AGENTS.md`](AGENTS.md) for the design questions that need
-answers first — chiefly where run outcomes are read from, where they are stored, and
-which screen shows them.
+Four tabs, cycled with the controller triggers like the native Statistics screen:
+
+| Tab | What it answers |
+| --- | --- |
+| **Overview** | Record, win rate, current and longest streak, a rolling win rate over the last 10/25/50/100 runs, which act you lose in, and what kills you |
+| **Blocks** | 10-run and 50-run blocks, newest first, each with its own record and the all-time win rate as of the end of that block |
+| **Characters** | Per-character record, win rate, that character's own last ten runs, and average act — plus a character-by-month grid |
+| **Months** | Per-month record with average floors, act, elites, and run length |
+
+A filter row above the tabs narrows the whole screen by **ascension**, by **character**,
+and by whether **abandoned** runs count. It opens on Ascension 10, every character,
+finished runs only, and remembers what you chose until the game closes.
+
+Two rules are not adjustable and are stated on the screen. Co-op runs are always
+excluded, because a shared win is not the same evidence about your play as a solo one.
+And blocks are counted from the oldest run forward, so a block always covers the same ten
+runs no matter how many you play afterwards.
+
+## Where the numbers come from
+
+The game already records every finished run as a `.run` file under your profile's
+`saves/history`. This mod reads those directly — the same files the Run History screen
+pages through — so there is nothing to enable before a run counts, and runs played before
+the mod was installed are included.
+
+Reading roughly 30 MB of run files takes long enough to stutter a screen transition, so it
+happens off the main thread and the screen fills in when it lands. Parsed runs are cached
+for the session, so opening the screen again is instant.
 
 ## Build
 
@@ -28,7 +51,7 @@ Building copies `WinrateTracker.json`, `WinrateTracker.dll`, and `WinrateTracker
 Close the game first, or the DLL will be locked.
 
 Runtime diagnostics are in `%APPDATA%\SlayTheSpire2\logs\godot.log`. A successful start
-logs `Winrate Tracker v0.1.0 initialized`.
+logs `Winrate Tracker v0.2.0 initialized`.
 
 ## Publish to the Steam Workshop
 

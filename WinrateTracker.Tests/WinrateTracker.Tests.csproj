@@ -11,7 +11,12 @@
       project: it references sts2.dll, which cannot be loaded outside the game.
       Keep game-independent calculations in their own files so they can be linked here.
     -->
-    <Compile Include="..\WinrateTrackerCode\Example.cs" Link="Example.cs" />
+    <Compile Include="..\WinrateTrackerCode\RunRecord.cs" Link="RunRecord.cs" />
+    <Compile Include="..\WinrateTrackerCode\RunParser.cs" Link="RunParser.cs" />
+    <Compile Include="..\WinrateTrackerCode\RunFilter.cs" Link="RunFilter.cs" />
+    <Compile Include="..\WinrateTrackerCode\WinrateReport.cs" Link="WinrateReport.cs" />
+    <Compile Include="..\WinrateTrackerCode\Format.cs" Link="Format.cs" />
+    <Compile Include="..\WinrateTrackerCode\ReportTables.cs" Link="ReportTables.cs" />
 
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
