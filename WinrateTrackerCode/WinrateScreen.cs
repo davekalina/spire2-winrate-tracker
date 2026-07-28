@@ -46,6 +46,12 @@ internal sealed class WinrateScreen : IDisposable
 
     private const float FilterRowHeight = 132f;
 
+    /// <summary>The screen's design height; the scroll mask's gradient is a fraction of it.</summary>
+    private const float ReferenceHeight = 1080f;
+
+    /// <summary>How much of the screen the content takes to dissolve, as a fraction.</summary>
+    private const float FadeDepth = 0.05f;
+
     private static WinrateScreen? _current;
 
     private readonly NStatsScreen _screen;
@@ -93,6 +99,12 @@ internal sealed class WinrateScreen : IDisposable
         _content = new VBoxContainer();
         _content.AddThemeConstantOverride("separation", NativeStyle.SectionSeparation);
 
+        // Must start hidden, exactly as NMainMenuSubmenuStack does for the game's own
+        // submenus. NSubmenu enables its back button from the VisibilityChanged signal,
+        // and NSubmenuStack.Push raises that by setting Visible = true — which is not a
+        // change, and so not a signal, on a screen that was already visible. Skip this and
+        // the screen opens with no way out of it.
+        _screen.Visible = false;
         stack.AddChild(_screen);
         _screen.SetStack(stack);
         StatsScreenPatch.SuppressNativeStats(_screen);
@@ -116,8 +128,10 @@ internal sealed class WinrateScreen : IDisposable
                 Callable.From<NClickableControl>(_ => Show(tab)));
         }
 
-        _screen.AddChild(BuildFilterRow());
         ReplaceNativeContent();
+        RaiseContentFade();
+        // Added last so the filter row sits above the scroll body in draw order.
+        _screen.AddChild(BuildFilterRow());
     }
 
     private static int TabCount => Enum.GetValues<ReportTab>().Length;
@@ -255,24 +269,75 @@ internal sealed class WinrateScreen : IDisposable
 
     private Control BuildFilterRow()
     {
-        var row = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Pass };
-        row.AddThemeConstantOverride("separation", 8);
         // Anchored to the screen's centre, like the tab row above it, so the filters stay
         // put at any resolution.
-        row.AnchorLeft = 0.5f;
-        row.AnchorRight = 0.5f;
-        row.AnchorTop = 0.5f;
-        row.AnchorBottom = 0.5f;
-        row.OffsetLeft = -760f;
-        row.OffsetRight = 760f;
-        row.OffsetTop = FilterRowTop;
-        row.OffsetBottom = FilterRowTop + FilterRowHeight;
-        row.GrowHorizontal = Control.GrowDirection.Both;
-        row.GrowVertical = Control.GrowDirection.Both;
+        var frame = new Control { MouseFilter = Control.MouseFilterEnum.Pass };
+        frame.AnchorLeft = 0.5f;
+        frame.AnchorRight = 0.5f;
+        frame.AnchorTop = 0.5f;
+        frame.AnchorBottom = 0.5f;
+        frame.OffsetLeft = -760f;
+        frame.OffsetRight = 760f;
+        frame.OffsetTop = FilterRowTop;
+        frame.OffsetBottom = FilterRowTop + FilterRowHeight;
+        frame.GrowHorizontal = Control.GrowDirection.Both;
+        frame.GrowVertical = Control.GrowDirection.Both;
 
+        // A band behind the filters in the same slate the stats panels use, so they read
+        // as a fixed header rather than as text floating over the table.
+        var backdrop = new ColorRect
+        {
+            Color = NativeStyle.PanelColor,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        backdrop.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        frame.AddChild(backdrop);
+
+        var row = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Pass };
+        row.AddThemeConstantOverride("separation", 8);
+        row.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         row.AddChild(_filters.Root);
         row.AddChild(_summary);
-        return row;
+        frame.AddChild(row);
+        return frame;
+    }
+
+    /// <summary>
+    /// Raise the point at which scrolled content dissolves, so it disappears above the
+    /// filter row instead of sliding underneath it.
+    ///
+    /// The scroll body is clipped by a <c>Mask</c> whose gradient alpha is the clip: the
+    /// scene fades content out over the top eighth of the screen, which sits well above
+    /// where this screen's filter row starts. Re-cutting the gradient is the screen's own
+    /// mechanism for this — the same one that fades the last row away at the bottom — so
+    /// the result still looks like the native screen rather than a lid laid over it.
+    /// </summary>
+    private void RaiseContentFade()
+    {
+        if (_screen.GetNodeOrNull<TextureRect>("%StatsGrid/ScrollableContent/Mask") is not { } mask)
+            return;
+
+        var fadeEnd = (FilterRowTop + FilterRowHeight + ReferenceHeight / 2f) / ReferenceHeight;
+        var gradient = new Gradient
+        {
+            Offsets = [fadeEnd - FadeDepth, fadeEnd, 0.975f, 1f],
+            Colors =
+            [
+                new Color(0, 0, 0, 0),
+                new Color(0, 0, 0, 1),
+                new Color(0, 0, 0, 1),
+                // The scene's own bottom stop, kept so the foot of the list fades as before.
+                new Color(0.0862745f, 0.0862745f, 0.0862745f, 0),
+            ],
+        };
+
+        mask.Texture = new GradientTexture2D
+        {
+            Gradient = gradient,
+            Width = 1,
+            Height = 128,
+            FillTo = new Vector2(0, 1),
+        };
     }
 
     /// <summary>

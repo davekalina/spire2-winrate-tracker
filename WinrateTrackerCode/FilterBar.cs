@@ -16,11 +16,15 @@ namespace WinrateTracker.WinrateTrackerCode;
 /// The scene is driven directly rather than through <c>NPaginator</c>. Its root node
 /// carries no script — the settings screen attaches one per paginator in its own scene —
 /// so instantiating it yields a plain <see cref="Control" /> and there is no
-/// <c>NPaginator</c> to talk to. What the scene does provide is the two arrows, which are
-/// real <c>NPaginateArrow</c> buttons with their own hover and press feedback. They look
-/// for a paginator parent with a null-conditional call, find none, and do nothing — but
-/// they still emit <c>Released</c>, which is all this needs. Paging, the label, and the
-/// wrap-around are handled here.
+/// <c>NPaginator</c> to talk to.
+///
+/// Its two arrows cannot be reused as they are either: <c>NPaginateArrow._Ready</c> opens
+/// with <c>GetParent&lt;NPaginator&gt;()</c>, which is a hard cast, so under any other
+/// parent it throws before reaching the three lines that bind its own image and shader.
+/// The arrow is then half-built and dead. So each arrow's artwork is moved onto a control
+/// this file owns, and the scripted node is dropped — before the scene enters the tree,
+/// where <c>_Ready</c> would fire. The texture, shader, scale, and pivot all travel with
+/// the reparented image, so the arrows still look exactly like the settings screen's.
 ///
 /// Options come from the archive itself, so the ascension list only offers ascensions
 /// that have actually been played.
@@ -133,6 +137,11 @@ internal sealed class FilterBar
     /// </summary>
     private sealed class Cycler
     {
+        /// <summary>Hover nudge, taken from <c>NPaginateArrow.OnFocus</c>.</summary>
+        private const float HoverScale = 1.1f;
+
+        private const double HoverDuration = 0.05;
+
         private readonly MegaLabel _label;
         private readonly List<Option> _options = [];
         private int _index;
@@ -145,8 +154,8 @@ internal sealed class FilterBar
             // screen showing the scene's placeholder text.
             paginator.GetNode<Control>("%VfxLabel").Visible = false;
 
-            Connect(paginator, "LeftArrow", -1);
-            Connect(paginator, "RightArrow", +1);
+            ReplaceArrow(paginator, "LeftArrow", -1);
+            ReplaceArrow(paginator, "RightArrow", +1);
         }
 
         public event Action? Changed;
@@ -163,13 +172,63 @@ internal sealed class FilterBar
             Refresh();
         }
 
-        private void Connect(Control paginator, string arrowName, int step)
+        /// <summary>
+        /// Swap one <c>NPaginateArrow</c> for a plain control wearing its artwork, and
+        /// make that clickable. Called before the paginator is in the tree, so the
+        /// scripted node is freed without its <c>_Ready</c> ever running.
+        /// </summary>
+        private void ReplaceArrow(Control paginator, string arrowName, int step)
         {
-            if (paginator.GetNodeOrNull<NClickableControl>(arrowName) is not { } arrow)
+            if (paginator.GetNodeOrNull<Control>(arrowName) is not { } scripted)
                 return;
+            if (scripted.GetNodeOrNull<TextureRect>("Image") is not { } image)
+                return;
+
+            var arrow = new Control
+            {
+                Name = arrowName,
+                CustomMinimumSize = scripted.CustomMinimumSize,
+                AnchorLeft = scripted.AnchorLeft,
+                AnchorTop = scripted.AnchorTop,
+                AnchorRight = scripted.AnchorRight,
+                AnchorBottom = scripted.AnchorBottom,
+                OffsetLeft = scripted.OffsetLeft,
+                OffsetTop = scripted.OffsetTop,
+                OffsetRight = scripted.OffsetRight,
+                OffsetBottom = scripted.OffsetBottom,
+                GrowHorizontal = scripted.GrowHorizontal,
+                GrowVertical = scripted.GrowVertical,
+                MouseFilter = Control.MouseFilterEnum.Stop,
+                MouseDefaultCursorShape = Control.CursorShape.PointingHand,
+            };
+
+            scripted.RemoveChild(image);
+            arrow.AddChild(image);
+            paginator.RemoveChild(scripted);
+            scripted.QueueFree();
+            paginator.AddChild(arrow);
+
+            var restingScale = image.Scale;
+            arrow.Connect(Control.SignalName.MouseEntered, Callable.From(() => Scale(image, restingScale * HoverScale)));
+            arrow.Connect(Control.SignalName.MouseExited, Callable.From(() => Scale(image, restingScale)));
             arrow.Connect(
-                NClickableControl.SignalName.Released,
-                Callable.From<NClickableControl>(_ => Step(step)));
+                Control.SignalName.GuiInput,
+                Callable.From<InputEvent>(input =>
+                {
+                    if (input is not InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true })
+                        return;
+                    arrow.AcceptEvent();
+                    Scale(image, restingScale);
+                    Step(step);
+                }));
+        }
+
+        /// <summary>Matches the scale nudge <c>NPaginateArrow</c> plays on hover.</summary>
+        private static void Scale(Control image, Vector2 target)
+        {
+            if (!image.IsInsideTree())
+                return;
+            image.CreateTween().TweenProperty(image, "scale", target, HoverDuration);
         }
 
         private void Step(int step)
