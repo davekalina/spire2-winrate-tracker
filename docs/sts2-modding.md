@@ -61,7 +61,10 @@ once, before the first upload. It determines:
 - **BaseLib settings key** — `ModConfigRegistry.Register(id, ...)`; changing the id resets
   stored settings to defaults
 - **Steam conflict key** — a Workshop copy and a local copy sharing an id conflict, and
-  the loader disables one of them, preferring whichever version string is greater
+  the loader disables one of them. Versions are compared as semantic versions, not
+  as strings, so `v0.10.0` correctly beats `v0.9.0`, and a leading `v` is ignored.
+  **On equal versions the Steam copy loses**, which is deliberate: it lets a local
+  development build shadow the published one without renaming anything
 
 ## Where the loader looks
 
