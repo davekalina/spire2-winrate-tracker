@@ -58,8 +58,21 @@ internal static class NativeStyle
     private static Font? _bold;
     private static Font? _regular;
 
-    private static Font Bold => _bold ??= GD.Load<Font>(BoldFontPath);
-    private static Font Regular => _regular ??= GD.Load<Font>(RegularFontPath);
+    private static Font Bold => _bold = Reload(_bold, BoldFontPath);
+    private static Font Regular => _regular = Reload(_regular, RegularFontPath);
+
+    /// <summary>
+    /// Fetch a font, re-loading it if the one held has been freed underneath us.
+    ///
+    /// A plain <c>??=</c> cache is not safe here. Godot's resource cache releases a font
+    /// once nothing in the tree references it, which happens every time the game tears a
+    /// scene down — entering or leaving a run. The managed wrapper survives that, but its
+    /// native object does not, and the next <c>AddThemeFontOverride</c> throws
+    /// <see cref="ObjectDisposedException" />. That reads as the screen working for a
+    /// session and then quietly building nothing but empty tabs.
+    /// </summary>
+    private static Font Reload(Font? held, string path) =>
+        held is not null && GodotObject.IsInstanceValid(held) ? held : GD.Load<Font>(path);
 
     /// <summary>A gold section heading, matching the native "Overall Stats" header exactly.</summary>
     public static MegaLabel Header(string text)

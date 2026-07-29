@@ -220,24 +220,41 @@ internal sealed class WinrateScreen : IDisposable
         Rebuild();
     }
 
+    /// <summary>
+    /// Recompute the report and redraw the open tab.
+    ///
+    /// The replacement is built before the old table is torn down. Clearing first and
+    /// building second means anything that throws mid-build leaves the screen blank, with
+    /// the header still reporting a healthy run count — which looks like the data
+    /// vanished rather than like a bug in the drawing.
+    /// </summary>
     private void Rebuild()
     {
         if (!_screen.IsValid())
             return;
+
+        Control replacement;
+        try
+        {
+            var runs = WinrateSession.Filter.Apply(RunArchive.Runs);
+            var report = WinrateReport.Build(runs);
+            _summary.SetTextAutoSize(SummaryText(report));
+            replacement = NativeTable.BuildTab(
+                ReportTables.Build(WinrateSession.Tab, report),
+                EmptyMessage());
+        }
+        catch (Exception exception)
+        {
+            MainFile.Logger.Error($"Could not draw the {WinrateSession.Tab} tab: {exception}");
+            return;
+        }
 
         foreach (var child in _content.GetChildren())
         {
             _content.RemoveChild(child);
             child.QueueFree();
         }
-
-        var runs = WinrateSession.Filter.Apply(RunArchive.Runs);
-        var report = WinrateReport.Build(runs);
-
-        _summary.SetTextAutoSize(SummaryText(report));
-        _content.AddChild(NativeTable.BuildTab(
-            ReportTables.Build(WinrateSession.Tab, report),
-            EmptyMessage()));
+        _content.AddChild(replacement);
     }
 
     private static string EmptyMessage()
