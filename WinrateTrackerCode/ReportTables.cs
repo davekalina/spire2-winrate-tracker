@@ -4,6 +4,27 @@ namespace WinrateTracker.WinrateTrackerCode;
 internal sealed record TableColumn(string Header, bool RightAligned = false);
 
 /// <summary>
+/// One cell. Usually a single value, but a column can carry two related numbers — a
+/// record and its rate — as separate parts.
+///
+/// Parts are not separate columns on purpose. A column gap is sized to separate one
+/// heading's worth of data from the next, and putting a record and its own rate either
+/// side of that gap spends it in the wrong place: the two look as far apart as two
+/// different characters do. As parts they sit under one heading, tight together, and
+/// still line up down the page because the renderer measures each part across the whole
+/// column.
+/// </summary>
+internal sealed record TableCell(IReadOnlyList<string> Parts)
+{
+    public static implicit operator TableCell(string text) => new([text]);
+
+    public static TableCell Pair(string first, string second) => new([first, second]);
+
+    /// <summary>The whole cell as one string. For tests and diagnostics.</summary>
+    public string Text => string.Join(' ', Parts);
+}
+
+/// <summary>
 /// One period as the graph plots it: a bar for the wins, a point on the line for the
 /// all-time rate as of that period's end. Oldest first, which is left to right.
 /// </summary>
@@ -13,16 +34,9 @@ internal sealed record SeriesPoint(string Label, int Wins, int Runs, double Cumu
 internal sealed record TableSection(
     string Title,
     IReadOnlyList<TableColumn> Columns,
-    IReadOnlyList<IReadOnlyList<string>> Rows,
+    IReadOnlyList<IReadOnlyList<TableCell>> Rows,
     IReadOnlyList<SeriesPoint>? Series = null)
 {
-    /// <summary>
-    /// An optional row above the column headers, one entry per column, blank where a
-    /// column has no group. It lets a pair of columns sit under one heading — the
-    /// month-by-character grid gives each character one name over its record and rate.
-    /// </summary>
-    public IReadOnlyList<string>? GroupHeaders { get; init; }
-
     public bool IsEmpty => Rows.Count == 0;
 
     /// <summary>Whether this table has something worth plotting.</summary>
@@ -67,7 +81,7 @@ internal static class ReportTables
         if (report.IsEmpty)
             return [];
 
-        List<IReadOnlyList<string>> summary =
+        List<IReadOnlyList<TableCell>> summary =
         [
             ["Runs", Format.Count(report.Overall.Runs)],
             ["Record", Format.WinLoss(report.Overall)],
@@ -78,7 +92,7 @@ internal static class ReportTables
             ["Last run", Format.Date(report.LastRun!.Value)],
         ];
 
-        List<IReadOnlyList<string>> rolling =
+        List<IReadOnlyList<TableCell>> rolling =
         [
             ["All time", Format.WinLoss(report.Overall), Format.Percent(report.Overall)],
         ];
@@ -95,11 +109,11 @@ internal static class ReportTables
             new TableSection(
                 "Losses by act",
                 [new TableColumn("act"), new TableColumn("losses", RightAligned: true)],
-                report.LossesByAct.Select(row => (IReadOnlyList<string>)[row.Label, Format.Count(row.Count)]).ToList()),
+                report.LossesByAct.Select(row => (IReadOnlyList<TableCell>)[row.Label, Format.Count(row.Count)]).ToList()),
             new TableSection(
                 "Top deaths",
                 [new TableColumn("encounter"), new TableColumn("losses", RightAligned: true)],
-                report.TopDeaths.Select(row => (IReadOnlyList<string>)[row.Label, Format.Count(row.Count)]).ToList()),
+                report.TopDeaths.Select(row => (IReadOnlyList<TableCell>)[row.Label, Format.Count(row.Count)]).ToList()),
         ];
     }
 
@@ -135,29 +149,27 @@ internal static class ReportTables
             new(labelHeader),
             new("from", RightAligned: true),
             new("to", RightAligned: true),
-            new("W-L", RightAligned: true),
+            new(withOwnRate ? "record" : "W-L", RightAligned: true),
+            new("cumulative%", RightAligned: true),
         ];
-        if (withOwnRate)
-            columns.Add(new TableColumn("win%", RightAligned: true));
-        columns.Add(new TableColumn("overall%", RightAligned: true));
         if (withFloors)
             columns.Add(new TableColumn("avg floors", RightAligned: true));
 
         var rows = periods.Select(period =>
         {
-            List<string> cells =
+            List<TableCell> cells =
             [
                 period.Label,
                 Format.ShortDate(period.From),
                 Format.ShortDate(period.To),
-                Format.WinLoss(period.Tally),
+                withOwnRate
+                    ? TableCell.Pair(Format.WinLoss(period.Tally), Format.WholePercent(period.Tally))
+                    : Format.WinLoss(period.Tally),
+                Format.Percent(period.CumulativeWinRate),
             ];
-            if (withOwnRate)
-                cells.Add(Format.WholePercent(period.Tally));
-            cells.Add(Format.Percent(period.CumulativeWinRate));
             if (withFloors)
                 cells.Add(Format.Average(period.AverageFloors));
-            return (IReadOnlyList<string>)cells;
+            return (IReadOnlyList<TableCell>)cells;
         }).ToList();
 
         // The table reads newest first; the graph reads left to right through time.
@@ -179,55 +191,37 @@ internal static class ReportTables
             [
                 new TableColumn("character"),
                 new TableColumn("runs", RightAligned: true),
-                new TableColumn("W-L", RightAligned: true),
-                new TableColumn("win%", RightAligned: true),
-                new TableColumn("W-L", RightAligned: true),
-                new TableColumn("win%", RightAligned: true),
-                // Ten runs needs no rate column, for the same reason the 10-run blocks
-                // table does without one.
-                new TableColumn("W-L", RightAligned: true),
+                new TableColumn("all time", RightAligned: true),
+                new TableColumn("last 50", RightAligned: true),
+                // Ten runs needs no rate, for the same reason the 10-run blocks table
+                // does without one.
+                new TableColumn("last 10", RightAligned: true),
             ],
-            report.Characters.Select(row => (IReadOnlyList<string>)
+            report.Characters.Select(row => (IReadOnlyList<TableCell>)
             [
                 row.Character,
                 Format.Count(row.All.Runs),
-                Format.WinLoss(row.All),
-                Format.WholePercent(row.All),
-                Format.WinLoss(row.Last50),
-                Format.WholePercent(row.Last50),
+                TableCell.Pair(Format.WinLoss(row.All), Format.WholePercent(row.All)),
+                TableCell.Pair(Format.WinLoss(row.Last50), Format.WholePercent(row.Last50)),
                 Format.WinLoss(row.Last10),
-            ]).ToList())
-        {
-            GroupHeaders = ["", "", "all time", "", "last 50", "", "last 10"],
-        };
+            ]).ToList());
 
-        // Each character gets one name over a record column and a rate column.
+        // One column per character, its record and rate paired inside it.
         var columns = new List<TableColumn> { new("month") };
-        var groups = new List<string> { "" };
-        foreach (var character in report.MatrixCharacters)
-        {
-            columns.Add(new TableColumn("W-L", RightAligned: true));
-            columns.Add(new TableColumn("win%", RightAligned: true));
-            groups.Add(character);
-            groups.Add("");
-        }
+        columns.AddRange(report.MatrixCharacters.Select(character => new TableColumn(character, RightAligned: true)));
 
         var matrix = new TableSection(
             "Month by character",
             columns,
             report.MonthByCharacter.Select(row =>
             {
-                var cells = new List<string> { row.Label };
+                var cells = new List<TableCell> { row.Label };
                 foreach (var tally in row.Cells)
-                {
-                    cells.Add(tally is { } played ? Format.WinLoss(played) : Format.Empty);
-                    cells.Add(tally is { } rate ? Format.WholePercent(rate) : Format.Empty);
-                }
-                return (IReadOnlyList<string>)cells;
-            }).ToList())
-        {
-            GroupHeaders = groups,
-        };
+                    cells.Add(tally is { } played
+                        ? TableCell.Pair(Format.WinLoss(played), Format.WholePercent(played))
+                        : TableCell.Pair(Format.Empty, ""));
+                return (IReadOnlyList<TableCell>)cells;
+            }).ToList());
 
         return [byCharacter, matrix];
     }

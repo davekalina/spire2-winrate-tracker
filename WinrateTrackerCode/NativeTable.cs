@@ -48,12 +48,7 @@ internal static class NativeTable
         grid.AddThemeConstantOverride("h_separation", NativeStyle.ColumnSeparation);
         grid.AddThemeConstantOverride("v_separation", NativeStyle.RowSeparation);
 
-        // A group row sits above the column headers, naming spans of columns.
-        if (section.GroupHeaders is { } groups)
-            for (var i = 0; i < section.Columns.Count; i++)
-                grid.AddChild(NativeStyle.GroupHeaderCell(
-                    i < groups.Count ? groups[i] : "",
-                    section.Columns[i].RightAligned));
+        var partWidths = MeasurePartWidths(section);
 
         // A header row of empty strings would still reserve its height, so a section that
         // labels nothing (the Overview summary) skips the row entirely.
@@ -63,11 +58,71 @@ internal static class NativeTable
 
         foreach (var row in section.Rows)
             for (var i = 0; i < section.Columns.Count; i++)
-                grid.AddChild(NativeStyle.Cell(
+                grid.AddChild(BuildCell(
                     i < row.Count ? row[i] : Format.Empty,
-                    section.Columns[i].RightAligned));
+                    section.Columns[i].RightAligned,
+                    partWidths[i]));
 
         return grid;
+    }
+
+    /// <summary>
+    /// The widest each part gets anywhere in its column, so a record and its rate line up
+    /// down the page even though they share one grid cell. Measured with the real font
+    /// rather than estimated from character counts, because the game's numerals are not
+    /// the same width as its letters.
+    /// </summary>
+    private static float[][] MeasurePartWidths(TableSection section)
+    {
+        var widths = new float[section.Columns.Count][];
+        for (var column = 0; column < section.Columns.Count; column++)
+        {
+            var parts = section.Rows.Count == 0
+                ? 1
+                : section.Rows.Max(row => column < row.Count ? row[column].Parts.Count : 1);
+            widths[column] = new float[parts];
+
+            if (parts == 1)
+                continue;
+
+            foreach (var row in section.Rows)
+            {
+                if (column >= row.Count)
+                    continue;
+                var cell = row[column];
+                for (var part = 0; part < cell.Parts.Count && part < parts; part++)
+                    widths[column][part] = Math.Max(
+                        widths[column][part],
+                        NativeStyle.MeasureCell(cell.Parts[part]));
+            }
+        }
+        return widths;
+    }
+
+    private static Control BuildCell(TableCell cell, bool rightAligned, float[] partWidths)
+    {
+        if (cell.Parts.Count <= 1)
+            return NativeStyle.Cell(cell.Parts.Count == 0 ? Format.Empty : cell.Parts[0], rightAligned);
+
+        var row = new HBoxContainer
+        {
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            // The pair keeps its measured width and sits against the column's right edge.
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            Alignment = BoxContainer.AlignmentMode.End,
+        };
+        row.AddThemeConstantOverride("separation", NativeStyle.PartSeparation);
+
+        for (var part = 0; part < cell.Parts.Count; part++)
+        {
+            var label = NativeStyle.Cell(cell.Parts[part], rightAligned: true);
+            // Fill, not ExpandFill: the measured width is the point, and expanding would
+            // let each row size its own parts and break the alignment.
+            label.SizeFlagsHorizontal = Control.SizeFlags.Fill;
+            label.CustomMinimumSize = new Vector2(part < partWidths.Length ? partWidths[part] : 0, 0);
+            row.AddChild(label);
+        }
+        return row;
     }
 
     /// <summary>All of a tab's sections, separated the way the native screen separates blocks.</summary>

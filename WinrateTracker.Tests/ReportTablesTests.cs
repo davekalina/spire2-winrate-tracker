@@ -14,6 +14,10 @@ public class ReportTablesTests
     private static TableSection Section(ReportTab tab, WinrateReport report, string title) =>
         Assert.Single(ReportTables.Build(tab, report), section => section.Title == title);
 
+    /// <summary>A row as plain strings, a paired cell joined by a space.</summary>
+    private static string[] Texts(IReadOnlyList<TableCell> row) =>
+        row.Select(cell => cell.Text).ToArray();
+
     /// <summary>Every tab, so a new one cannot be added without these checks covering it.</summary>
     private static readonly ReportTab[] AllTabs = Enum.GetValues<ReportTab>();
 
@@ -57,13 +61,13 @@ public class ReportTablesTests
     {
         var rows = Section(ReportTab.Overview, Report("WLLWW"), "Overall").Rows;
 
-        Assert.Equal(["Runs", "5"], rows[0]);
-        Assert.Equal(["Record", "3-2"], rows[1]);
-        Assert.Equal(["Win rate", "60.0%"], rows[2]);
-        Assert.Equal(["Current streak", "2 wins"], rows[3]);
-        Assert.Equal(["Longest win streak", "2"], rows[4]);
-        Assert.Equal(["First run", "2026-01-01"], rows[5]);
-        Assert.Equal(["Last run", "2026-01-05"], rows[6]);
+        Assert.Equal(["Runs", "5"], Texts(rows[0]));
+        Assert.Equal(["Record", "3-2"], Texts(rows[1]));
+        Assert.Equal(["Win rate", "60.0%"], Texts(rows[2]));
+        Assert.Equal(["Current streak", "2 wins"], Texts(rows[3]));
+        Assert.Equal(["Longest win streak", "2"], Texts(rows[4]));
+        Assert.Equal(["First run", "2026-01-01"], Texts(rows[5]));
+        Assert.Equal(["Last run", "2026-01-05"], Texts(rows[6]));
     }
 
     [Fact]
@@ -71,11 +75,11 @@ public class ReportTablesTests
     {
         var rows = Section(ReportTab.Overview, Report(new string('L', 100) + new string('W', 10)), "Rolling win rate").Rows;
 
-        Assert.Equal(["All time", "10-100", "9.1%"], rows[0]);
-        Assert.Equal(["Last 100", "10-90", "10.0%"], rows[1]);
-        Assert.Equal(["Last 50", "10-40", "20.0%"], rows[2]);
-        Assert.Equal(["Last 25", "10-15", "40.0%"], rows[3]);
-        Assert.Equal(["Last 10", "10-0", "100.0%"], rows[4]);
+        Assert.Equal(["All time", "10-100", "9.1%"], Texts(rows[0]));
+        Assert.Equal(["Last 100", "10-90", "10.0%"], Texts(rows[1]));
+        Assert.Equal(["Last 50", "10-40", "20.0%"], Texts(rows[2]));
+        Assert.Equal(["Last 25", "10-15", "40.0%"], Texts(rows[3]));
+        Assert.Equal(["Last 10", "10-0", "100.0%"], Texts(rows[4]));
     }
 
     [Fact]
@@ -83,7 +87,7 @@ public class ReportTablesTests
     {
         var rows = Section(ReportTab.Overview, Report("WL"), "Rolling win rate").Rows;
 
-        Assert.Equal(["All time", "1-1", "50.0%"], Assert.Single(rows));
+        Assert.Equal(["All time", "1-1", "50.0%"], Texts(Assert.Single(rows)));
     }
 
     [Fact]
@@ -91,12 +95,13 @@ public class ReportTablesTests
     {
         var section = Section(ReportTab.Splits, Report(new string('L', 10) + new string('W', 10)), "10-run blocks");
 
-        // A block of ten needs no win% column of its own.
+        // A block of ten needs no rate of its own.
         Assert.Equal(
-            ["block", "from", "to", "W-L", "overall%"],
+            ["block", "from", "to", "W-L", "cumulative%"],
             section.Columns.Select(column => column.Header));
-        Assert.Equal(["11-20", "01-11", "01-20", "10-0", "50.0%"], section.Rows[0]);
-        Assert.Equal(["1-10", "01-01", "01-10", "0-10", "0.0%"], section.Rows[1]);
+        Assert.Equal(["11-20", "01-11", "01-20", "10-0", "50.0%"], Texts(section.Rows[0]));
+        Assert.Equal(["1-10", "01-01", "01-10", "0-10", "0.0%"], Texts(section.Rows[1]));
+        Assert.All(section.Rows, row => Assert.Single(row[3].Parts));
     }
 
     [Fact]
@@ -107,20 +112,20 @@ public class ReportTablesTests
         var ten = Assert.Single(sections, section => section.Title == "10-run blocks");
         var fifty = Assert.Single(sections, section => section.Title == "50-run blocks");
 
-        Assert.DoesNotContain("win%", ten.Columns.Select(column => column.Header));
-        Assert.Contains("win%", fifty.Columns.Select(column => column.Header));
+        Assert.Single(ten.Rows[0][3].Parts);
+        Assert.Equal(2, fifty.Rows[0][3].Parts.Count);
     }
 
     [Fact]
-    public void Records_and_rates_live_in_separate_columns()
+    public void A_record_and_its_rate_share_one_column_as_two_parts()
     {
         var section = Section(ReportTab.Splits, Report(new string('W', 60)), "By patch");
 
+        // One heading, not a W-L column and a win% column either side of a column gap.
         Assert.Equal(
-            ["patch", "from", "to", "W-L", "win%", "overall%"],
+            ["patch", "from", "to", "record", "cumulative%"],
             section.Columns.Select(column => column.Header));
-        // No bracketed rate stowed inside the record cell.
-        Assert.All(section.Rows, row => Assert.DoesNotContain("(", row[3]));
+        Assert.Equal(["60-0", "100%"], section.Rows[0][3].Parts);
     }
 
     [Fact]
@@ -131,7 +136,7 @@ public class ReportTablesTests
         Assert.Equal(
             ["By month", "By patch", "10-run blocks", "50-run blocks"],
             sections.Select(section => section.Title));
-        Assert.Equal("Jan 2026", sections[0].Rows[0][0]);
+        Assert.Equal("Jan 2026", sections[0].Rows[0][0].Text);
     }
 
     [Fact]
@@ -152,7 +157,7 @@ public class ReportTablesTests
         var section = Section(ReportTab.Splits, Report(new string('L', 10) + new string('W', 10)), "10-run blocks");
 
         Assert.True(section.IsGraphable);
-        Assert.Equal("11-20", section.Rows[0][0]);
+        Assert.Equal("11-20", section.Rows[0][0].Text);
         Assert.Equal("1-10", section.Series![0].Label);
         Assert.Equal(0, section.Series[0].Wins);
         Assert.Equal(10, section.Series[1].Wins);
@@ -195,33 +200,37 @@ public class ReportTablesTests
 
         var section = Section(ReportTab.Characters, WinrateReport.Build(runs), "Month by character");
 
-        // One name per character, over a record column and a rate column.
-        Assert.Equal(["", "Ironclad", "", "Silent", ""], section.GroupHeaders);
-        Assert.Equal(["month", "W-L", "win%", "W-L", "win%"], section.Columns.Select(column => column.Header));
-        Assert.Equal(["Feb 2026", "—", "—", "0-1", "0%"], section.Rows[0]);
-        Assert.Equal(["Jan 2026", "1-0", "100%", "—", "—"], section.Rows[1]);
+        // One column per character, its record and rate paired inside it.
+        Assert.Equal(["month", "Ironclad", "Silent"], section.Columns.Select(column => column.Header));
+        Assert.Equal(["Ironclad", "Silent"], section.Columns.Skip(1).Select(column => column.Header));
+        Assert.Equal(["0-1", "0%"], section.Rows[0][2].Parts);
+        Assert.Equal(["1-0", "100%"], section.Rows[1][1].Parts);
+        // A month a character did not play reads as a dash with no rate beside it.
+        Assert.Equal(["—", ""], section.Rows[0][1].Parts);
     }
 
     [Fact]
-    public void The_character_table_splits_each_record_from_its_rate()
+    public void The_character_table_pairs_each_record_with_its_rate()
     {
         var section = Section(ReportTab.Characters, Report("WLWL"), "By character");
 
-        Assert.Equal(["", "", "all time", "", "last 50", "", "last 10"], section.GroupHeaders);
         Assert.Equal(
-            ["character", "runs", "W-L", "win%", "W-L", "win%", "W-L"],
+            ["character", "runs", "all time", "last 50", "last 10"],
             section.Columns.Select(column => column.Header));
-        Assert.Equal(["Ironclad", "4", "2-2", "50%", "2-2", "50%", "2-2"], section.Rows[0]);
+        Assert.Equal(["2-2", "50%"], section.Rows[0][2].Parts);
+        Assert.Equal(["2-2", "50%"], section.Rows[0][3].Parts);
+        // Ten runs needs no rate.
+        Assert.Equal(["2-2"], section.Rows[0][4].Parts);
     }
 
     [Fact]
-    public void A_group_header_row_has_one_entry_per_column()
+    public void A_paired_cell_never_carries_more_than_two_parts()
     {
         var report = Report("WLLWLWLLLWLLWLLLWLLWLLLWWLWL");
 
         foreach (var tab in AllTabs)
         foreach (var section in ReportTables.Build(tab, report))
-            if (section.GroupHeaders is { } groups)
-                Assert.Equal(section.Columns.Count, groups.Count);
+        foreach (var row in section.Rows)
+            Assert.All(row, cell => Assert.InRange(cell.Parts.Count, 1, 2));
     }
 }

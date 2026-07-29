@@ -13,7 +13,7 @@ Three tabs, cycled with the controller triggers like the native Statistics scree
 | Tab | What it answers |
 | --- | --- |
 | **Overview** | Record, win rate, current and longest streak, a rolling win rate over the last 10/25/50/100 runs, which act you lose in, and what kills you |
-| **Splits** | The same archive cut four ways — by month, by patch, and into 10-run and 50-run blocks — each newest first, each carrying its own record and the all-time win rate as of its end |
+| **Splits** | The same archive cut four ways — by month, by patch, and into 10-run and 50-run blocks — each newest first, each carrying its own record and the cumulative win rate as of its end |
 | **Characters** | Per-character record all time, over the last 50, and over the last 10 — plus a month-by-character grid |
 
 Every table on **Splits** has a **Show Graph** button: a bar per period for the wins in
@@ -69,7 +69,7 @@ Building copies `WinrateTracker.json`, `WinrateTracker.dll`, and `WinrateTracker
 Close the game first, or the DLL will be locked.
 
 Runtime diagnostics are in `%APPDATA%\SlayTheSpire2\logs\godot.log`. A successful start
-logs `Winrate Tracker v0.4.0 initialized`.
+logs `Winrate Tracker v0.4.1 initialized`.
 
 ## Publish to the Steam Workshop
 

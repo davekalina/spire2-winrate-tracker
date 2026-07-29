@@ -31,8 +31,18 @@ internal static class NativeStyle
     public const int CellFontSize = 25;
     public const int NoteFontSize = 20;
 
-    /// <summary>Gap between columns, from the stats screen's <c>GridContainer</c>.</summary>
-    public const int ColumnSeparation = 56;
+    /// <summary>
+    /// Gap between columns. The native stats screen uses 56, but it only ever shows two
+    /// columns; at eight or more that much air is what pushes a table past the screen.
+    /// </summary>
+    public const int ColumnSeparation = 34;
+
+    /// <summary>
+    /// Gap between the parts of one cell — a record and its own rate. Deliberately far
+    /// tighter than <see cref="ColumnSeparation" />: they belong to each other, and a
+    /// column-sized gap makes them look as unrelated as two different characters.
+    /// </summary>
+    public const int PartSeparation = 12;
 
     public const int RowSeparation = 6;
     public const int SectionSeparation = 28;
@@ -172,17 +182,11 @@ internal static class NativeStyle
 
     private const int ButtonFontSize = 22;
 
-    /// <summary>
-    /// A heading over a span of columns, dimmer than the column headers under it so the
-    /// two rows read as a hierarchy rather than as two competing header rows.
-    /// </summary>
-    public static MegaLabel GroupHeaderCell(string text, bool rightAligned)
-    {
-        var label = Label(text, ColumnHeaderFontSize + 2, HeaderColor, bold: true);
-        label.HorizontalAlignment = rightAligned ? HorizontalAlignment.Right : HorizontalAlignment.Left;
-        label.SizeFlagsHorizontal = rightAligned ? Control.SizeFlags.ExpandFill : Control.SizeFlags.Fill;
-        return label;
-    }
+    /// <summary>How wide a cell's text is in the body font. Drives part alignment.</summary>
+    public static float MeasureCell(string text) =>
+        string.IsNullOrEmpty(text)
+            ? 0f
+            : Regular.GetStringSize(text, HorizontalAlignment.Left, -1, CellFontSize).X;
 
     /// <summary>The translucent panel a table sits on, with the native insets applied.</summary>
     public static MarginContainer Panel(Control content)
