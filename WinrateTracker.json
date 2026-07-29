@@ -3,7 +3,7 @@
   "name": "Winrate Tracker",
   "author": "realtruegravy",
   "description": "A Win Rates screen in the Compendium: rolling and all-time win rate by run block, character, and month.",
-  "version": "v0.2.3",
+  "version": "v0.3.0",
   "min_game_version": "0.109.0",
   "has_pck": false,
   "has_dll": true,

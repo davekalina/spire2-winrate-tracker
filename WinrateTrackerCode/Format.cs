@@ -27,9 +27,18 @@ internal static class Format
     public static string WinLoss(Tally tally) =>
         tally.Runs == 0 ? Empty : $"{tally.Wins}-{tally.Losses}";
 
-    /// <summary>e.g. <c>83/347</c>, for matrix cells where the denominator varies per cell.</summary>
-    public static string WinsOverRuns(Tally tally) =>
-        tally.Runs == 0 ? Empty : $"{tally.Wins}/{tally.Runs}";
+    /// <summary>
+    /// e.g. <c>13-37 (26%)</c> — the record and its rate in one cell.
+    ///
+    /// The rate is whole-percent here rather than the one decimal used in a dedicated
+    /// win-rate column. Inside a bracket beside the record it is a reading aid, not the
+    /// number being compared, and a decimal point would widen every column for precision
+    /// nobody reads across.
+    /// </summary>
+    public static string Record(Tally tally) =>
+        tally.Runs == 0
+            ? Empty
+            : $"{tally.Wins}-{tally.Losses} ({(tally.WinRate * 100d).ToString("0", CultureInfo.InvariantCulture)}%)";
 
     public static string Count(int value) => value.ToString(CultureInfo.InvariantCulture);
 

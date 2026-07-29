@@ -61,6 +61,7 @@ internal sealed class WinrateScreen : IDisposable
     private FilterBar _filters = null!;
     private VBoxContainer _content = null!;
     private MegaLabel _summary = null!;
+    private GraphPopup? _graph;
 
     private WinrateScreen(NSubmenuStack stack)
     {
@@ -162,6 +163,10 @@ internal sealed class WinrateScreen : IDisposable
             }
         }
 
+        // A graph left open from last time would be sitting over the screen on reopen.
+        _current._graph?.Close();
+        _current._graph = null;
+
         stack.Push(_current._screen);
         _current.RestoreTab();
         _current.BeginLoad();
@@ -190,13 +195,11 @@ internal sealed class WinrateScreen : IDisposable
     /// </summary>
     private void BeginLoad()
     {
-        if (RunArchive.HasLoaded)
-        {
-            Rebuild();
-            return;
-        }
-
         Rebuild();
+
+        // Resolved every time rather than once: the history directory is profile-scoped,
+        // so switching profiles changes it, and RunArchive empties its cache when it does.
+        // Re-reading is cheap when nothing moved, because parsed runs are cached by file.
         var directory = RunArchive.ResolveHistoryDirectory();
         _ = Task.Run(async () =>
         {
@@ -221,6 +224,16 @@ internal sealed class WinrateScreen : IDisposable
     }
 
     /// <summary>
+    /// Put a table's graph up over the screen. Only one at a time, so pressing Show Graph
+    /// on a second table replaces the first rather than stacking them.
+    /// </summary>
+    private void ShowGraph(TableSection section)
+    {
+        _graph?.Close();
+        _graph = GraphPopup.Show(_screen, section);
+    }
+
+    /// <summary>
     /// Recompute the report and redraw the open tab.
     ///
     /// The replacement is built before the old table is torn down. Clearing first and
@@ -241,7 +254,8 @@ internal sealed class WinrateScreen : IDisposable
             _summary.SetTextAutoSize(SummaryText(report));
             replacement = NativeTable.BuildTab(
                 ReportTables.Build(WinrateSession.Tab, report),
-                EmptyMessage());
+                EmptyMessage(),
+                ShowGraph);
         }
         catch (Exception exception)
         {

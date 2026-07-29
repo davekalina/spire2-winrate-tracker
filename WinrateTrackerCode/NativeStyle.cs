@@ -1,5 +1,7 @@
 using Godot;
 using MegaCrit.Sts2.Core.Helpers;
+using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
+using MegaCrit.Sts2.Core.Nodes.Screens.Settings;
 using MegaCrit.Sts2.addons.mega_text;
 
 namespace WinrateTracker.WinrateTrackerCode;
@@ -131,6 +133,31 @@ internal static class NativeStyle
         label.AddThemeColorOverride("font_color", color);
         return label;
     }
+
+    /// <summary>
+    /// A small labelled button, built from the game's settings tab — the one native
+    /// scene that is a self-contained, focusable button carrying a label it will set for
+    /// you. Its own scene sizes it for a tab row, so it is scaled down here.
+    /// </summary>
+    public static Control TextButton(string text, Action onPressed)
+    {
+        var button = SceneHelper.Instantiate<NSettingsTab>("screens/settings_tab");
+        button.CustomMinimumSize = ButtonSize;
+        button.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        button.Ready += () =>
+        {
+            button.SetLabel(text);
+            // Tabs open deselected, which reads as "off" on a plain button.
+            button.Select();
+        };
+        button.Connect(
+            NClickableControl.SignalName.Released,
+            Callable.From<NClickableControl>(_ => onPressed()));
+        return button;
+    }
+
+    /// <summary>Roughly two-thirds of a settings tab, which is sized for a tab row.</summary>
+    private static readonly Vector2 ButtonSize = new(180, 58);
 
     /// <summary>The translucent panel a table sits on, with the native insets applied.</summary>
     public static MarginContainer Panel(Control content)

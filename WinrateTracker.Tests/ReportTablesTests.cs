@@ -21,7 +21,7 @@ public class ReportTablesTests
     public void Every_tab_has_a_title()
     {
         Assert.Equal(
-            ["Overview", "Blocks", "Characters", "Months"],
+            ["Overview", "Blocks", "Characters"],
             AllTabs.Select(ReportTables.Title));
     }
 
@@ -92,10 +92,10 @@ public class ReportTablesTests
         var section = Section(ReportTab.Blocks, Report(new string('L', 10) + new string('W', 10)), "10-run blocks");
 
         Assert.Equal(
-            ["block", "from", "to", "W-L", "win%", "overall%"],
+            ["block", "from", "to", "record", "overall%"],
             section.Columns.Select(column => column.Header));
-        Assert.Equal(["11-20", "01-11", "01-20", "10-0", "100.0%", "50.0%"], section.Rows[0]);
-        Assert.Equal(["1-10", "01-01", "01-10", "0-10", "0.0%", "0.0%"], section.Rows[1]);
+        Assert.Equal(["11-20", "01-11", "01-20", "10-0 (100%)", "50.0%"], section.Rows[0]);
+        Assert.Equal(["1-10", "01-01", "01-10", "0-10 (0%)", "0.0%"], section.Rows[1]);
     }
 
     [Fact]
@@ -103,35 +103,63 @@ public class ReportTablesTests
     {
         var sections = ReportTables.Build(ReportTab.Blocks, Report(new string('W', 60)));
 
-        Assert.Equal(2, sections.Count);
+        var ten = Assert.Single(sections, section => section.Title == "10-run blocks");
+        var fifty = Assert.Single(sections, section => section.Title == "50-run blocks");
         Assert.Equal(
-            sections[0].Columns.Select(column => column.Header),
-            sections[1].Columns.Select(column => column.Header));
+            ten.Columns.Select(column => column.Header),
+            fifty.Columns.Select(column => column.Header));
     }
 
     [Fact]
-    public void The_character_matrix_gains_a_column_per_month()
+    public void Months_lead_the_blocks_tab_and_are_named_rather_than_numbered()
     {
-        var runs = new List<RunRecord>
+        var sections = ReportTables.Build(ReportTab.Blocks, Report("WL"));
+
+        Assert.Equal(
+            ["By month", "By patch", "10-run blocks", "50-run blocks"],
+            sections.Select(section => section.Title));
+        Assert.Equal("Jan 2026", sections[0].Rows[0][0]);
+    }
+
+    [Fact]
+    public void Every_period_table_carries_a_series_matching_its_rows()
+    {
+        var report = Report(new string('L', 10) + new string('W', 10));
+
+        foreach (var section in ReportTables.Build(ReportTab.Blocks, report))
         {
-            Run(Unix(2026, 1, 5), win: true, character: "Ironclad"),
-            Run(Unix(2026, 2, 5), character: "Ironclad"),
-        };
-
-        var section = Section(ReportTab.Characters, WinrateReport.Build(runs), "Character by month");
-
-        Assert.Equal(["character", "Jan", "Feb"], section.Columns.Select(column => column.Header));
-        Assert.Equal(["Ironclad", "1/1", "0/1"], section.Rows[0]);
-        Assert.Equal(["Total", "1/1", "0/1"], section.Rows[1]);
-        Assert.Equal(["Total %", "100.0%", "0.0%"], section.Rows[2]);
+            Assert.NotNull(section.Series);
+            Assert.Equal(section.Rows.Count, section.Series!.Count);
+        }
     }
 
     [Fact]
-    public void Months_are_named_rather_than_numbered()
+    public void A_series_reads_oldest_first_even_though_the_table_reads_newest_first()
     {
-        var section = Section(ReportTab.Months, Report("WL"), "By month");
+        var section = Section(ReportTab.Blocks, Report(new string('L', 10) + new string('W', 10)), "10-run blocks");
 
-        Assert.Equal("Jan 2026", section.Rows[0][0]);
+        Assert.True(section.IsGraphable);
+        Assert.Equal("11-20", section.Rows[0][0]);
+        Assert.Equal("1-10", section.Series![0].Label);
+        Assert.Equal(0, section.Series[0].Wins);
+        Assert.Equal(10, section.Series[1].Wins);
+    }
+
+    [Fact]
+    public void A_single_period_is_not_worth_a_graph()
+    {
+        var section = Section(ReportTab.Blocks, Report("WL"), "10-run blocks");
+
+        Assert.Single(section.Series!);
+        Assert.False(section.IsGraphable);
+    }
+
+    [Fact]
+    public void Tables_that_cannot_be_plotted_carry_no_series()
+    {
+        Assert.All(
+            ReportTables.Build(ReportTab.Characters, Report("WLWL")),
+            section => Assert.Null(section.Series));
     }
 
     [Fact]
@@ -144,11 +172,29 @@ public class ReportTablesTests
     }
 
     [Fact]
-    public void Tables_that_need_a_caveat_carry_one()
+    public void The_character_matrix_runs_months_down_and_characters_across()
     {
-        Assert.NotNull(Section(ReportTab.Blocks, Report("WL"), "10-run blocks").Note);
-        Assert.NotNull(Section(ReportTab.Overview, Report("WL"), "Rolling win rate").Note);
-        Assert.NotNull(Section(ReportTab.Characters, Report("WL"), "By character").Note);
-        Assert.NotNull(Section(ReportTab.Months, Report("WL"), "By month").Note);
+        var runs = new List<RunRecord>
+        {
+            Run(Unix(2026, 1, 5), win: true, character: "Ironclad"),
+            Run(Unix(2026, 2, 5), character: "Silent"),
+        };
+
+        var section = Section(ReportTab.Characters, WinrateReport.Build(runs), "Month by character");
+
+        Assert.Equal(["month", "Ironclad", "Silent"], section.Columns.Select(column => column.Header));
+        Assert.Equal(["Feb 2026", "—", "0-1 (0%)"], section.Rows[0]);
+        Assert.Equal(["Jan 2026", "1-0 (100%)", "—"], section.Rows[1]);
+    }
+
+    [Fact]
+    public void The_character_table_shows_records_with_their_rates_and_no_average_act()
+    {
+        var section = Section(ReportTab.Characters, Report("WLWL"), "By character");
+
+        Assert.Equal(
+            ["character", "runs", "all time", "last 50", "last 10"],
+            section.Columns.Select(column => column.Header));
+        Assert.Equal(["Ironclad", "4", "2-2 (50%)", "2-2 (50%)", "2-2 (50%)"], section.Rows[0]);
     }
 }

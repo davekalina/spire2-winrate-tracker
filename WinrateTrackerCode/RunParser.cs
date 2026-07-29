@@ -55,6 +55,7 @@ internal static class RunParser
 
             var win = ReadBoolean(root, "win");
             var killedBy = ReadString(root, "killed_by_encounter");
+            var (patch, patchOrder) = PatchOf(ReadString(root, "build_id"));
 
             return new RunRecord
             {
@@ -75,8 +76,37 @@ internal static class RunParser
                 Rests = counts.Rests,
                 Events = counts.Events,
                 KilledBy = win || killedBy is null or NoEncounter ? "" : CleanId(killedBy),
+                Patch = patch,
+                PatchOrder = patchOrder,
             };
         }
+    }
+
+    /// <summary>
+    /// Reduce a build id to the patch it belongs to: <c>v0.109.1</c> becomes
+    /// <c>v0.109</c>, so a patch and its hotfixes report as one line — they are the same
+    /// balance, and splitting them makes two small samples out of one useful one.
+    ///
+    /// The numbers come back alongside because version strings do not sort as text:
+    /// <c>v0.98</c> sorts after <c>v0.100</c>. Anything that does not parse (the game's
+    /// own <c>pre-v0.42</c> placeholder, or a build id from a future format) is kept
+    /// verbatim and sorted to the start, since it can only be older than what we can read.
+    /// </summary>
+    public static (string Patch, (int Major, int Minor) Order) PatchOf(string? buildId)
+    {
+        if (string.IsNullOrWhiteSpace(buildId))
+            return ("Unknown", (int.MinValue, int.MinValue));
+
+        var trimmed = buildId.TrimStart('v', 'V');
+        var parts = trimmed.Split('.');
+        if (parts.Length >= 2
+            && int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var major)
+            && int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var minor))
+        {
+            return ($"v{major}.{minor}", (major, minor));
+        }
+
+        return (buildId, (int.MinValue, int.MinValue));
     }
 
     /// <summary>

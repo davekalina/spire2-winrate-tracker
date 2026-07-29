@@ -33,7 +33,9 @@ public class WinrateReportTests
         Assert.Null(report.FirstRun);
         Assert.Empty(report.Blocks10);
         Assert.Empty(report.Characters);
-        Assert.Empty(report.CharacterByMonth);
+        Assert.Empty(report.Months);
+        Assert.Empty(report.Patches);
+        Assert.Empty(report.MonthByCharacter);
     }
 
     [Fact]
@@ -132,7 +134,7 @@ public class WinrateReportTests
     {
         var newest = Report(new string('L', 25)).Blocks10[0];
 
-        Assert.Equal(5, newest.Block.Runs);
+        Assert.Equal(5, newest.Tally.Runs);
         Assert.Equal(new DateTime(2026, 1, 21), newest.From.Date);
         Assert.Equal(new DateTime(2026, 1, 25), newest.To.Date);
     }
@@ -146,9 +148,9 @@ public class WinrateReportTests
         var newest = report.Blocks10[0];
         var oldest = report.Blocks10[1];
 
-        Assert.Equal(1.0d, newest.Block.WinRate, 6);
+        Assert.Equal(1.0d, newest.Tally.WinRate, 6);
         Assert.Equal(0.5d, newest.CumulativeWinRate, 6);
-        Assert.Equal(0d, oldest.Block.WinRate, 6);
+        Assert.Equal(0d, oldest.Tally.WinRate, 6);
         Assert.Equal(0d, oldest.CumulativeWinRate, 6);
     }
 
@@ -198,8 +200,8 @@ public class WinrateReportTests
 
         Assert.Equal(12, row.All.Runs);
         Assert.Equal(2, row.All.Wins);
-        Assert.Equal(10, row.Recent.Runs);
-        Assert.Equal(0, row.Recent.Wins);
+        Assert.Equal(10, row.Last10.Runs);
+        Assert.Equal(0, row.Last10.Wins);
     }
 
     [Fact]
@@ -207,50 +209,102 @@ public class WinrateReportTests
     {
         var row = Assert.Single(WinrateReport.Build(Sequence("WL", Start, "Regent")).Characters);
 
-        Assert.Equal(2, row.Recent.Runs);
-        Assert.Equal(1, row.Recent.Wins);
+        Assert.Equal(2, row.Last10.Runs);
+        Assert.Equal(1, row.Last10.Wins);
     }
 
     [Fact]
-    public void Average_act_counts_a_win_as_act_four()
+    public void A_characters_last_fifty_is_wider_than_its_last_ten()
     {
-        var runs = new List<RunRecord>
-        {
-            Run(Unix(2026, 1, 1), win: true),
-            Run(Unix(2026, 1, 2), actReached: 2),
-        };
+        // Sixty runs: fifty wins, then ten losses.
+        var runs = Sequence(new string('W', 50) + new string('L', 10), Start, "Regent");
 
-        Assert.Equal(3d, Assert.Single(WinrateReport.Build(runs).Characters).AverageAct, 6);
+        var row = Assert.Single(WinrateReport.Build(runs).Characters);
+
+        Assert.Equal(60, row.All.Runs);
+        Assert.Equal(0, row.Last10.Wins);
+        Assert.Equal(50, row.Last50.Runs);
+        Assert.Equal(40, row.Last50.Wins);
     }
 
     // ── months ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Months_are_listed_oldest_first_with_their_averages()
+    public void Months_are_listed_newest_first()
     {
         var runs = new List<RunRecord>
         {
-            Run(Unix(2026, 2, 3), win: true, nodes: 40, elites: 4, runTimeSeconds: 3600f),
-            Run(Unix(2026, 1, 5), nodes: 20, elites: 2, runTimeSeconds: 1800f),
-            Run(Unix(2026, 1, 6), nodes: 10, elites: 0, runTimeSeconds: 600f),
+            Run(Unix(2026, 1, 5), nodes: 20),
+            Run(Unix(2026, 1, 6), nodes: 10),
+            Run(Unix(2026, 2, 3), win: true, nodes: 40),
         };
 
-        var months = WinrateReport.Build(runs.OrderBy(run => run.StartTime).ToList()).Months;
+        var months = WinrateReport.Build(runs).Months;
 
-        Assert.Equal(["2026-01", "2026-02"], months.Select(row => row.Month));
-        Assert.Equal(2, months[0].Tally.Runs);
-        Assert.Equal(0, months[0].Tally.Wins);
-        Assert.Equal(15d, months[0].AverageNodes, 6);
-        Assert.Equal(1d, months[0].AverageElites, 6);
-        Assert.Equal(20d, months[0].AverageMinutes, 6);
-        Assert.Equal(1, months[1].Tally.Wins);
-        Assert.Equal(4d, months[1].AverageAct, 6);
+        Assert.Equal(["Feb 2026", "Jan 2026"], months.Select(row => row.Label));
+        Assert.Equal(1, months[0].Tally.Wins);
+        Assert.Equal(2, months[1].Tally.Runs);
+        Assert.Equal(15d, months[1].AverageFloors, 6);
     }
 
-    // ── character by month ───────────────────────────────────────────────────
+    [Fact]
+    public void A_months_cumulative_rate_covers_everything_up_to_its_end()
+    {
+        var runs = new List<RunRecord>
+        {
+            Run(Unix(2026, 1, 5)),
+            Run(Unix(2026, 1, 6)),
+            Run(Unix(2026, 2, 3), win: true),
+            Run(Unix(2026, 2, 4), win: true),
+        };
+
+        var months = WinrateReport.Build(runs).Months;
+
+        // February alone is 100%, but half the archive by the end of it.
+        Assert.Equal(1.0d, months[0].Tally.WinRate, 6);
+        Assert.Equal(0.5d, months[0].CumulativeWinRate, 6);
+        Assert.Equal(0d, months[1].CumulativeWinRate, 6);
+    }
+
+    // ── patches ──────────────────────────────────────────────────────────────
 
     [Fact]
-    public void The_matrix_has_a_column_per_month_and_totals_underneath()
+    public void Hotfixes_share_a_row_with_their_patch()
+    {
+        var runs = new List<RunRecord>
+        {
+            Run(Unix(2026, 1, 1), buildId: "v0.108.0"),
+            Run(Unix(2026, 1, 2), win: true, buildId: "v0.108.1"),
+            Run(Unix(2026, 1, 3), buildId: "v0.109.0"),
+        };
+
+        var patches = WinrateReport.Build(runs).Patches;
+
+        Assert.Equal(["v0.109", "v0.108"], patches.Select(row => row.Label));
+        Assert.Equal(2, patches[1].Tally.Runs);
+        Assert.Equal(1, patches[1].Tally.Wins);
+    }
+
+    [Fact]
+    public void Patches_sort_by_version_not_as_text()
+    {
+        var runs = new List<RunRecord>
+        {
+            Run(Unix(2026, 1, 1), buildId: "v0.98.0"),
+            Run(Unix(2026, 1, 2), buildId: "v0.100.0"),
+            Run(Unix(2026, 1, 3), buildId: "v0.109.0"),
+        };
+
+        // As text, v0.98 would sort after v0.100.
+        Assert.Equal(
+            ["v0.109", "v0.100", "v0.98"],
+            WinrateReport.Build(runs).Patches.Select(row => row.Label));
+    }
+
+    // ── month by character ───────────────────────────────────────────────────
+
+    [Fact]
+    public void The_matrix_runs_months_down_and_characters_across()
     {
         var runs = new List<RunRecord>
         {
@@ -259,15 +313,14 @@ public class WinrateReportTests
             Run(Unix(2026, 2, 5), character: "Ironclad"),
         };
 
-        var report = WinrateReport.Build(runs.OrderBy(run => run.StartTime).ToList());
+        var report = WinrateReport.Build(runs);
 
-        Assert.Equal(["2026-01", "2026-02"], report.MatrixMonths);
-        Assert.Equal(["Ironclad", "Silent", "Total", "Total %"], report.CharacterByMonth.Select(row => row.Label));
-        Assert.Equal(["1/1", "0/1"], report.CharacterByMonth[0].Cells);
+        Assert.Equal(["Ironclad", "Silent"], report.MatrixCharacters);
+        Assert.Equal(["Feb 2026", "Jan 2026", "Total"], report.MonthByCharacter.Select(row => row.Label));
         // Silent never played in February.
-        Assert.Equal(["0/1", "—"], report.CharacterByMonth[1].Cells);
-        Assert.Equal(["1/2", "0/1"], report.CharacterByMonth[2].Cells);
-        Assert.Equal(["50.0%", "0.0%"], report.CharacterByMonth[3].Cells);
+        Assert.Equal(["0-1 (0%)", "—"], report.MonthByCharacter[0].Cells);
+        Assert.Equal(["1-0 (100%)", "0-1 (0%)"], report.MonthByCharacter[1].Cells);
+        Assert.Equal(["1-1 (50%)", "0-1 (0%)"], report.MonthByCharacter[2].Cells);
     }
 
     // ── deaths ───────────────────────────────────────────────────────────────

@@ -50,6 +50,25 @@ internal sealed record RunRecord
     /// <summary>Display name of the encounter that ended the run, or empty on a win.</summary>
     public string KilledBy { get; init; } = "";
 
+    /// <summary>
+    /// The game build the run was played on, e.g. <c>v0.109.1</c>, grouped to its minor
+    /// version — <c>v0.109</c>. Hotfixes inside one patch are the same balance, so they
+    /// belong on one row. See <see cref="RunParser.PatchOf" />.
+    /// </summary>
+    public string Patch { get; init; } = "";
+
+    /// <summary>
+    /// Sort key for <see cref="Patch" />. Version strings do not sort as text —
+    /// <c>v0.98</c> would land after <c>v0.100</c> — so the numbers are kept.
+    /// </summary>
+    public (int Major, int Minor) PatchOrder { get; init; }
+
+    /// <summary>
+    /// An abandon on the first floor, which is a reroll rather than a run that was lost.
+    /// The mod setting can drop these; see <see cref="RunFilter.IgnoreEarlyAbandons" />.
+    /// </summary>
+    public bool IsEarlyAbandon => Abandoned && Nodes < RunFilter.EarlyAbandonFloor;
+
     /// <summary>Local wall-clock start. Month and date grouping both come from this.</summary>
     public DateTime LocalStart => DateTimeOffset.FromUnixTimeSeconds(StartTime).ToLocalTime().DateTime;
 

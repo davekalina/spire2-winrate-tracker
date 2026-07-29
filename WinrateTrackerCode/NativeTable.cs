@@ -12,21 +12,34 @@ namespace WinrateTracker.WinrateTrackerCode;
 /// </summary>
 internal static class NativeTable
 {
-    /// <summary>Title, panelled table, and optional caveat, stacked.</summary>
-    public static Control BuildSection(TableSection section)
+    /// <summary>
+    /// Title (with a Show Graph button where there is something to plot) over the
+    /// panelled table.
+    /// </summary>
+    public static Control BuildSection(TableSection section, Action<TableSection>? onShowGraph)
     {
         var column = new VBoxContainer();
         column.AddThemeConstantOverride("separation", 4);
 
         if (!string.IsNullOrEmpty(section.Title))
-            column.AddChild(NativeStyle.Header(section.Title));
+            column.AddChild(BuildHeaderRow(section, onShowGraph));
 
         column.AddChild(NativeStyle.Panel(BuildGrid(section)));
-
-        if (!string.IsNullOrEmpty(section.Note))
-            column.AddChild(NativeStyle.Note(section.Note));
-
         return column;
+    }
+
+    private static Control BuildHeaderRow(TableSection section, Action<TableSection>? onShowGraph)
+    {
+        var header = NativeStyle.Header(section.Title);
+        if (onShowGraph is null || !section.IsGraphable)
+            return header;
+
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 24);
+        header.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        row.AddChild(header);
+        row.AddChild(NativeStyle.TextButton("Show Graph", () => onShowGraph(section)));
+        return row;
     }
 
     private static GridContainer BuildGrid(TableSection section)
@@ -51,7 +64,10 @@ internal static class NativeTable
     }
 
     /// <summary>All of a tab's sections, separated the way the native screen separates blocks.</summary>
-    public static Control BuildTab(IReadOnlyList<TableSection> sections, string emptyMessage)
+    public static Control BuildTab(
+        IReadOnlyList<TableSection> sections,
+        string emptyMessage,
+        Action<TableSection>? onShowGraph = null)
     {
         var column = new VBoxContainer();
         column.AddThemeConstantOverride("separation", NativeStyle.SectionSeparation);
@@ -63,7 +79,7 @@ internal static class NativeTable
         }
 
         foreach (var section in sections)
-            column.AddChild(BuildSection(section));
+            column.AddChild(BuildSection(section, onShowGraph));
 
         return column;
     }

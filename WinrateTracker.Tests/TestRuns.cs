@@ -24,7 +24,8 @@ internal static class TestRuns
         int nodes = 17,
         int elites = 2,
         float runTimeSeconds = 1800f,
-        string killedBy = "") =>
+        string killedBy = "",
+        string buildId = "v0.109.1") =>
         new()
         {
             FileName = $"{startTime}.run",
@@ -39,6 +40,8 @@ internal static class TestRuns
             ActReached = win ? 4 : actReached,
             Elites = elites,
             KilledBy = win ? "" : killedBy,
+            Patch = RunParser.PatchOf(buildId).Patch,
+            PatchOrder = RunParser.PatchOf(buildId).Order,
         };
 
     /// <summary>

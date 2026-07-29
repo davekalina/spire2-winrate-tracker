@@ -80,8 +80,22 @@ internal static class RunArchive
         }
     }
 
+    /// <summary>The directory the cache was filled from, so a profile switch is noticed.</summary>
+    private static string? _loadedFrom;
+
     private static void Load(string? directory)
     {
+        // Each save profile has its own history directory. Switching profiles has to
+        // empty the cache, or the new profile is shown the old one's runs — which looks
+        // like the screen simply failing to update.
+        if (!string.Equals(_loadedFrom, directory, StringComparison.OrdinalIgnoreCase))
+        {
+            Cache.Clear();
+            UnreadableFiles = 0;
+            Runs = [];
+            _loadedFrom = directory;
+        }
+
         if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory))
         {
             FailureReason = "No run history was found for this profile.";

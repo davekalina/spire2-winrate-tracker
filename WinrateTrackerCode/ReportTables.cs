@@ -3,23 +3,31 @@ namespace WinrateTracker.WinrateTrackerCode;
 /// <summary>A column heading, and whether its values are numbers that line up on the right.</summary>
 internal sealed record TableColumn(string Header, bool RightAligned = false);
 
+/// <summary>
+/// One period as the graph plots it: a bar for the wins, a point on the line for the
+/// all-time rate as of that period's end. Oldest first, which is left to right.
+/// </summary>
+internal sealed record SeriesPoint(string Label, int Wins, int Runs, double CumulativeWinRate);
+
 /// <summary>A titled block of rows. One or more of these makes a tab.</summary>
 internal sealed record TableSection(
     string Title,
     IReadOnlyList<TableColumn> Columns,
     IReadOnlyList<IReadOnlyList<string>> Rows,
-    string? Note = null)
+    IReadOnlyList<SeriesPoint>? Series = null)
 {
     public bool IsEmpty => Rows.Count == 0;
+
+    /// <summary>Whether this table has something worth plotting.</summary>
+    public bool IsGraphable => Series is { Count: > 1 };
 }
 
-/// <summary>The four tabs, in the order they appear.</summary>
+/// <summary>The tabs, in the order they appear.</summary>
 internal enum ReportTab
 {
     Overview,
     Blocks,
     Characters,
-    Months,
 }
 
 /// <summary>
@@ -36,7 +44,6 @@ internal static class ReportTables
         ReportTab.Overview => "Overview",
         ReportTab.Blocks => "Blocks",
         ReportTab.Characters => "Characters",
-        ReportTab.Months => "Months",
         _ => tab.ToString(),
     };
 
@@ -45,7 +52,6 @@ internal static class ReportTables
         ReportTab.Overview => Overview(report),
         ReportTab.Blocks => Blocks(report),
         ReportTab.Characters => Characters(report),
-        ReportTab.Months => Months(report),
         _ => [],
     };
 
@@ -78,8 +84,7 @@ internal static class ReportTables
             new TableSection(
                 "Rolling win rate",
                 [new TableColumn("window"), new TableColumn("W-L", RightAligned: true), new TableColumn("win%", RightAligned: true)],
-                rolling,
-                "A moving window over the most recent runs, so the newest form is not diluted by the whole archive."),
+                rolling),
             new TableSection(
                 "Losses by act",
                 [new TableColumn("act"), new TableColumn("losses", RightAligned: true)],
@@ -91,6 +96,10 @@ internal static class ReportTables
         ];
     }
 
+    /// <summary>
+    /// Every way of cutting the archive into consecutive stretches: by month, by patch,
+    /// and by fixed-size blocks. All four are the same shape, so all four graph.
+    /// </summary>
     private static IReadOnlyList<TableSection> Blocks(WinrateReport report)
     {
         if (report.IsEmpty)
@@ -98,34 +107,53 @@ internal static class ReportTables
 
         return
         [
-            BlockSection("10-run blocks", report.Blocks10,
-                "Blocks are counted from the oldest run forward, so a block always covers the same ten runs. "
-                + "The last column is the all-time win rate as of the end of that block."),
-            BlockSection("50-run blocks", report.Blocks50, null),
+            PeriodSection("By month", report.Months, "month", withFloors: true),
+            PeriodSection("By patch", report.Patches, "patch"),
+            PeriodSection("10-run blocks", report.Blocks10, "block"),
+            PeriodSection("50-run blocks", report.Blocks50, "block"),
         ];
     }
 
-    private static TableSection BlockSection(string title, IReadOnlyList<BlockRow> blocks, string? note) =>
-        new(
-            title,
+    private static TableSection PeriodSection(
+        string title,
+        IReadOnlyList<PeriodRow> periods,
+        string labelHeader,
+        bool withFloors = false)
+    {
+        List<TableColumn> columns =
+        [
+            new(labelHeader),
+            new("from", RightAligned: true),
+            new("to", RightAligned: true),
+            new("record", RightAligned: true),
+            new("overall%", RightAligned: true),
+        ];
+        if (withFloors)
+            columns.Add(new TableColumn("avg floors", RightAligned: true));
+
+        var rows = periods.Select(period =>
+        {
+            List<string> cells =
             [
-                new TableColumn("block"),
-                new TableColumn("from", RightAligned: true),
-                new TableColumn("to", RightAligned: true),
-                new TableColumn("W-L", RightAligned: true),
-                new TableColumn("win%", RightAligned: true),
-                new TableColumn("overall%", RightAligned: true),
-            ],
-            blocks.Select(block => (IReadOnlyList<string>)
-            [
-                block.Label,
-                Format.ShortDate(block.From),
-                Format.ShortDate(block.To),
-                Format.WinLoss(block.Block),
-                Format.Percent(block.Block),
-                Format.Percent(block.CumulativeWinRate),
-            ]).ToList(),
-            note);
+                period.Label,
+                Format.ShortDate(period.From),
+                Format.ShortDate(period.To),
+                Format.Record(period.Tally),
+                Format.Percent(period.CumulativeWinRate),
+            ];
+            if (withFloors)
+                cells.Add(Format.Average(period.AverageFloors));
+            return (IReadOnlyList<string>)cells;
+        }).ToList();
+
+        // The table reads newest first; the graph reads left to right through time.
+        var series = periods
+            .Reverse()
+            .Select(period => new SeriesPoint(period.Label, period.Tally.Wins, period.Tally.Runs, period.CumulativeWinRate))
+            .ToList();
+
+        return new TableSection(title, columns, rows, series);
+    }
 
     private static IReadOnlyList<TableSection> Characters(WinrateReport report)
     {
@@ -137,69 +165,29 @@ internal static class ReportTables
             [
                 new TableColumn("character"),
                 new TableColumn("runs", RightAligned: true),
-                new TableColumn("W-L", RightAligned: true),
-                new TableColumn("win%", RightAligned: true),
+                new TableColumn("all time", RightAligned: true),
+                new TableColumn("last 50", RightAligned: true),
                 new TableColumn("last 10", RightAligned: true),
-                new TableColumn("last 10%", RightAligned: true),
-                new TableColumn("avg act", RightAligned: true),
             ],
             report.Characters.Select(row => (IReadOnlyList<string>)
             [
                 row.Character,
                 Format.Count(row.All.Runs),
-                Format.WinLoss(row.All),
-                Format.Percent(row.All),
-                Format.WinLoss(row.Recent),
-                Format.Percent(row.Recent),
-                Format.AverageAct(row.AverageAct),
-            ]).ToList(),
-            "Best win rate first. \"last 10\" is that character's own ten most recent runs.");
+                Format.Record(row.All),
+                Format.Record(row.Last50),
+                Format.Record(row.Last10),
+            ]).ToList());
 
-        var columns = new List<TableColumn> { new("character") };
-        columns.AddRange(report.MatrixMonths.Select(month => new TableColumn(Format.MonthAbbreviation(month), RightAligned: true)));
+        var columns = new List<TableColumn> { new("month") };
+        columns.AddRange(report.MatrixCharacters.Select(character => new TableColumn(character, RightAligned: true)));
 
         var matrix = new TableSection(
-            "Character by month",
+            "Month by character",
             columns,
-            report.CharacterByMonth
+            report.MonthByCharacter
                 .Select(row => (IReadOnlyList<string>)new[] { row.Label }.Concat(row.Cells).ToList())
-                .ToList(),
-            "Wins out of runs.");
+                .ToList());
 
         return [byCharacter, matrix];
-    }
-
-    private static IReadOnlyList<TableSection> Months(WinrateReport report)
-    {
-        if (report.IsEmpty)
-            return [];
-
-        return
-        [
-            new TableSection(
-                "By month",
-                [
-                    new TableColumn("month"),
-                    new TableColumn("runs", RightAligned: true),
-                    new TableColumn("W-L", RightAligned: true),
-                    new TableColumn("win%", RightAligned: true),
-                    new TableColumn("avg floors", RightAligned: true),
-                    new TableColumn("avg act", RightAligned: true),
-                    new TableColumn("avg elites", RightAligned: true),
-                    new TableColumn("avg min", RightAligned: true),
-                ],
-                report.Months.Select(row => (IReadOnlyList<string>)
-                [
-                    Format.MonthName(row.Month),
-                    Format.Count(row.Tally.Runs),
-                    Format.WinLoss(row.Tally),
-                    Format.Percent(row.Tally),
-                    Format.Average(row.AverageNodes),
-                    Format.AverageAct(row.AverageAct),
-                    Format.Average(row.AverageElites),
-                    Format.Minutes(row.AverageMinutes),
-                ]).ToList(),
-                "\"avg act\" counts a win as act 4, so it separates finishing act 3 from dying in it."),
-        ];
     }
 }

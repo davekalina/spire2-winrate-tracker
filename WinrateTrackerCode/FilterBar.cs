@@ -36,9 +36,21 @@ internal sealed class FilterBar
     /// <summary>Natural size of the paginator scene; it must be restated outside its own anchors.</summary>
     private static readonly Vector2 PaginatorSize = new(324, 64);
 
+    /// <summary>
+    /// Windows offered, in order. Null is the whole archive. A user-specified window is
+    /// not here yet — it needs a number entry, which this row has no room for.
+    /// </summary>
+    private static readonly (string Text, int? Days)[] Windows =
+    [
+        ("All", null),
+        ("Last 30 days", 30),
+        ("Last 60 days", 60),
+        ("Last 90 days", 90),
+    ];
+
     private readonly Cycler _ascension;
     private readonly Cycler _character;
-    private readonly Cycler _abandoned;
+    private readonly Cycler _window;
 
     public FilterBar()
     {
@@ -51,7 +63,7 @@ internal sealed class FilterBar
 
         _ascension = AddControl(row, "Ascension");
         _character = AddControl(row, "Character");
-        _abandoned = AddControl(row, "Runs");
+        _window = AddControl(row, "Time window");
 
         Root = row;
         Rebuild();
@@ -79,9 +91,9 @@ internal sealed class FilterBar
             RunArchive.KnownCharacters().Select(character => new Option(character, character)).Prepend(new Option("All", null)),
             filter.Character);
 
-        _abandoned.SetOptions(
-            [new Option("Finished", false), new Option("With abandoned", true)],
-            filter.IncludeAbandoned);
+        _window.SetOptions(
+            Windows.Select(window => new Option(window.Text, window.Days)),
+            filter.WindowDays);
 
         // Only write the selection back once the archive is in. Before then the option
         // lists hold nothing but "All", so publishing would quietly overwrite the
@@ -126,7 +138,8 @@ internal sealed class FilterBar
         {
             Ascension = _ascension.Selected as int?,
             Character = _character.Selected as string,
-            IncludeAbandoned = _abandoned.Selected is true,
+            WindowDays = _window.Selected as int?,
+            IgnoreEarlyAbandons = WinrateSettings.IgnoreEarlyAbandons,
         };
 
     /// <summary>One option: what it reads as, and the filter value behind it.</summary>
