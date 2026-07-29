@@ -1,29 +1,47 @@
 # Winrate Tracker
 
 An informational Slay the Spire 2 mod that reads your own run history and reports how
-often you actually win — rolling and all-time, sliced by run block, character, and month.
+often you actually win — rolling and all-time, split by month, patch, run block, and
+character.
 
 It adds a **Win Rates** tile to the Compendium, beside Statistics and Run History.
 
 ## The screen
 
-Four tabs, cycled with the controller triggers like the native Statistics screen:
+Three tabs, cycled with the controller triggers like the native Statistics screen:
 
 | Tab | What it answers |
 | --- | --- |
 | **Overview** | Record, win rate, current and longest streak, a rolling win rate over the last 10/25/50/100 runs, which act you lose in, and what kills you |
-| **Blocks** | 10-run and 50-run blocks, newest first, each with its own record and the all-time win rate as of the end of that block |
-| **Characters** | Per-character record, win rate, that character's own last ten runs, and average act — plus a character-by-month grid |
-| **Months** | Per-month record with average floors, act, elites, and run length |
+| **Splits** | The same archive cut four ways — by month, by patch, and into 10-run and 50-run blocks — each newest first, each carrying its own record and the all-time win rate as of its end |
+| **Characters** | Per-character record all time, over the last 50, and over the last 10 — plus a month-by-character grid |
+
+Every table on **Splits** has a **Show Graph** button: a bar per period for the wins in
+it, with the all-time win rate drawn over the top. Close it with its button or by
+clicking anywhere outside.
+
+Patches group by minor version, so a patch and its hotfixes (`v0.108.0`, `v0.108.1`)
+report as one line rather than two small samples.
 
 A filter row above the tabs narrows the whole screen by **ascension**, by **character**,
-and by whether **abandoned** runs count. It opens on Ascension 10, every character,
-finished runs only, and remembers what you chose until the game closes.
+and by **time window** (all time, or the last 30/60/90 days). It opens on Ascension 10,
+every character, all time, and remembers what you chose until the game closes. The window
+is measured back from your most recent run rather than from the clock, so it does not
+quietly empty itself while the game is left open.
+
+## What counts as a run
+
+An abandoned run counts as a loss. Quitting a run you were losing is not a different
+outcome from losing it, and letting abandons vanish is the easiest way to flatter a win
+rate without noticing. The exception is an abandon on the first floor, which is a reroll
+rather than a run — **Settings → Mod Settings → Ignore floor-1 abandons** drops those,
+and is on by default.
 
 Two rules are not adjustable and are stated on the screen. Co-op runs are always
 excluded, because a shared win is not the same evidence about your play as a solo one.
 And blocks are counted from the oldest run forward, so a block always covers the same ten
-runs no matter how many you play afterwards.
+runs no matter how many you play afterwards — which is what lets each row carry a
+meaningful running average.
 
 ## Where the numbers come from
 
@@ -51,7 +69,7 @@ Building copies `WinrateTracker.json`, `WinrateTracker.dll`, and `WinrateTracker
 Close the game first, or the DLL will be locked.
 
 Runtime diagnostics are in `%APPDATA%\SlayTheSpire2\logs\godot.log`. A successful start
-logs `Winrate Tracker v0.3.0 initialized`.
+logs `Winrate Tracker v0.3.1 initialized`.
 
 ## Publish to the Steam Workshop
 

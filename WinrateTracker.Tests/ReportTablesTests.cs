@@ -21,7 +21,7 @@ public class ReportTablesTests
     public void Every_tab_has_a_title()
     {
         Assert.Equal(
-            ["Overview", "Blocks", "Characters"],
+            ["Overview", "Splits", "Characters"],
             AllTabs.Select(ReportTables.Title));
     }
 
@@ -89,7 +89,7 @@ public class ReportTablesTests
     [Fact]
     public void Block_rows_end_with_the_running_all_time_rate()
     {
-        var section = Section(ReportTab.Blocks, Report(new string('L', 10) + new string('W', 10)), "10-run blocks");
+        var section = Section(ReportTab.Splits, Report(new string('L', 10) + new string('W', 10)), "10-run blocks");
 
         Assert.Equal(
             ["block", "from", "to", "record", "overall%"],
@@ -101,7 +101,7 @@ public class ReportTablesTests
     [Fact]
     public void Both_block_tables_use_the_same_columns()
     {
-        var sections = ReportTables.Build(ReportTab.Blocks, Report(new string('W', 60)));
+        var sections = ReportTables.Build(ReportTab.Splits, Report(new string('W', 60)));
 
         var ten = Assert.Single(sections, section => section.Title == "10-run blocks");
         var fifty = Assert.Single(sections, section => section.Title == "50-run blocks");
@@ -111,9 +111,9 @@ public class ReportTablesTests
     }
 
     [Fact]
-    public void Months_lead_the_blocks_tab_and_are_named_rather_than_numbered()
+    public void Months_lead_the_splits_tab_and_are_named_rather_than_numbered()
     {
-        var sections = ReportTables.Build(ReportTab.Blocks, Report("WL"));
+        var sections = ReportTables.Build(ReportTab.Splits, Report("WL"));
 
         Assert.Equal(
             ["By month", "By patch", "10-run blocks", "50-run blocks"],
@@ -126,7 +126,7 @@ public class ReportTablesTests
     {
         var report = Report(new string('L', 10) + new string('W', 10));
 
-        foreach (var section in ReportTables.Build(ReportTab.Blocks, report))
+        foreach (var section in ReportTables.Build(ReportTab.Splits, report))
         {
             Assert.NotNull(section.Series);
             Assert.Equal(section.Rows.Count, section.Series!.Count);
@@ -136,7 +136,7 @@ public class ReportTablesTests
     [Fact]
     public void A_series_reads_oldest_first_even_though_the_table_reads_newest_first()
     {
-        var section = Section(ReportTab.Blocks, Report(new string('L', 10) + new string('W', 10)), "10-run blocks");
+        var section = Section(ReportTab.Splits, Report(new string('L', 10) + new string('W', 10)), "10-run blocks");
 
         Assert.True(section.IsGraphable);
         Assert.Equal("11-20", section.Rows[0][0]);
@@ -148,7 +148,7 @@ public class ReportTablesTests
     [Fact]
     public void A_single_period_is_not_worth_a_graph()
     {
-        var section = Section(ReportTab.Blocks, Report("WL"), "10-run blocks");
+        var section = Section(ReportTab.Splits, Report("WL"), "10-run blocks");
 
         Assert.Single(section.Series!);
         Assert.False(section.IsGraphable);

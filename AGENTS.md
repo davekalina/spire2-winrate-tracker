@@ -20,9 +20,9 @@ pipeline work. Those are platform facts. This file is how I want the work done.
 
 ### What it does
 
-Adds a **Win Rates** tile to the Compendium bottom row, opening a four-tab screen —
-Overview, Blocks, Characters, Months — over the player's own run history, narrowed by a
-filter row (ascension, character, abandoned runs).
+Adds a **Win Rates** tile to the Compendium bottom row, opening a three-tab screen —
+Overview, Splits, Characters — over the player's own run history, narrowed by a filter
+row (ascension, character, time window). One setting lives in Settings → Mod Settings.
 
 ### How it is built, and why
 
@@ -47,14 +47,26 @@ filter row (ascension, character, abandoned runs).
   whole screen's contents are assertable without launching the game. Keep it that way —
   when adding a table, add it there, not in the renderer.
 
+- **Every stretch of runs is a `PeriodRow`** — a month, a patch, a 10-run block, a 50-run
+  block. One shape means one table builder, one graph, and no chance of the four
+  disagreeing about what a cumulative rate is. Add a new way of cutting the archive by
+  producing `PeriodRow`s, not by writing another table.
+
 Settled decisions worth not relitigating:
 
 - **Co-op runs are always excluded.** A shared win is not the same evidence about your
   play as a solo one. The screen says so rather than dropping them silently.
-- **Abandoned runs are excluded by default**, because abandoning is a decision to stop,
-  not a loss. The filter row can include them.
+- **An abandoned run counts as a loss.** Quitting a run you were losing is not a different
+  outcome from losing it. The one exception is a floor-1 abandon, which is a reroll; the
+  mod setting drops those and is on by default. It is a setting rather than a filter-row
+  control because what counts as a run should not change between two glances at a table.
 - **Blocks are anchored at the oldest run**, not the newest, so a block always covers the
   same ten runs and the cumulative column means something.
+- **The time window is measured back from the newest run**, not from the clock, so it does
+  not empty itself while the game sits open and the same archive always reads the same.
+- **Patches group by minor version.** A patch and its hotfixes are the same balance, and
+  splitting them makes two small samples out of one useful one. Sort by the parsed
+  numbers — `v0.98` sorts after `v0.100` as text.
 
 ### Surfaces to audit
 
@@ -62,9 +74,28 @@ Any directional change must be applied across all of these.
 
 - The Compendium tile (`CompendiumTilePatch`) — label, icon, tint, focus neighbours.
 - The filter row (`FilterBar`) — the three paginators and the summary line under them.
-- All four tabs (`ReportTables`) — a wording, rounding, or column change belongs in every
-  table it applies to, not just the one that was reported.
+- All three tabs (`ReportTables`) — a wording, rounding, or column change belongs in every
+  table it applies to, not just the one that was reported. Records read `13-37 (26%)`
+  wherever a record appears.
+- The graph popup (`GraphPopup`) — it must stay closable by both its button and a click
+  outside.
+- The mod setting (`ModSettingsPatch`, `WinrateSettings`).
 - The empty and loading states (`WinrateScreen.EmptyMessage`, `SummaryText`).
+
+### Verifying before it reaches the game
+
+Three failures in this mod's history were invisible to the compiler and to `PatchAll`,
+and only showed up as a screen that silently did nothing. Check all three offline:
+
+1. **Harmony targets and reflected field names** — a `MetadataLoadContext` pass over
+   `sts2.dll`. `PatchAll` throws on a missing method but nothing catches a bad field name.
+2. **Scene casts** — a scene's *root* must carry the script you are casting to.
+   `screens/paginator` does not, and `SceneHelper.Instantiate<NPaginator>` on it throws.
+   Check the scripted *children* too: `Node.GetParent<T>()` is a hard cast, and
+   `NPaginateArrow._Ready` uses it.
+3. **The log** — `%APPDATA%\SlayTheSpire2\logs\godot.log`. Godot catches exceptions thrown
+   inside signal handlers and `_Ready`, logs them, and carries on, so a broken screen
+   reports nothing on screen and everything in there.
 
 ## Mod UI: match the game
 

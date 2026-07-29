@@ -26,7 +26,7 @@ internal sealed record TableSection(
 internal enum ReportTab
 {
     Overview,
-    Blocks,
+    Splits,
     Characters,
 }
 
@@ -42,7 +42,7 @@ internal static class ReportTables
     public static string Title(ReportTab tab) => tab switch
     {
         ReportTab.Overview => "Overview",
-        ReportTab.Blocks => "Blocks",
+        ReportTab.Splits => "Splits",
         ReportTab.Characters => "Characters",
         _ => tab.ToString(),
     };
@@ -50,7 +50,7 @@ internal static class ReportTables
     public static IReadOnlyList<TableSection> Build(ReportTab tab, WinrateReport report) => tab switch
     {
         ReportTab.Overview => Overview(report),
-        ReportTab.Blocks => Blocks(report),
+        ReportTab.Splits => Splits(report),
         ReportTab.Characters => Characters(report),
         _ => [],
     };
@@ -100,7 +100,7 @@ internal static class ReportTables
     /// Every way of cutting the archive into consecutive stretches: by month, by patch,
     /// and by fixed-size blocks. All four are the same shape, so all four graph.
     /// </summary>
-    private static IReadOnlyList<TableSection> Blocks(WinrateReport report)
+    private static IReadOnlyList<TableSection> Splits(WinrateReport report)
     {
         if (report.IsEmpty)
             return [];
