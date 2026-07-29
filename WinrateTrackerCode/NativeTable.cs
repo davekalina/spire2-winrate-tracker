@@ -48,6 +48,13 @@ internal static class NativeTable
         grid.AddThemeConstantOverride("h_separation", NativeStyle.ColumnSeparation);
         grid.AddThemeConstantOverride("v_separation", NativeStyle.RowSeparation);
 
+        // A group row sits above the column headers, naming spans of columns.
+        if (section.GroupHeaders is { } groups)
+            for (var i = 0; i < section.Columns.Count; i++)
+                grid.AddChild(NativeStyle.GroupHeaderCell(
+                    i < groups.Count ? groups[i] : "",
+                    section.Columns[i].RightAligned));
+
         // A header row of empty strings would still reserve its height, so a section that
         // labels nothing (the Overview summary) skips the row entirely.
         if (section.Columns.Any(column => !string.IsNullOrEmpty(column.Header)))

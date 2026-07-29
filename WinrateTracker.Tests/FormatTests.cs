@@ -20,7 +20,7 @@ public class FormatTests
 
         Assert.Equal(Format.Empty, Format.Percent(empty));
         Assert.Equal(Format.Empty, Format.WinLoss(empty));
-        Assert.Equal(Format.Empty, Format.Record(empty));
+        Assert.Equal(Format.Empty, Format.WholePercent(empty));
     }
 
     [Fact]
@@ -30,12 +30,21 @@ public class FormatTests
     }
 
     [Theory]
-    [InlineData(50, 13, "13-37 (26%)")]
-    [InlineData(347, 83, "83-264 (24%)")]
-    [InlineData(4, 4, "4-0 (100%)")]
-    [InlineData(4, 0, "0-4 (0%)")]
-    public void A_record_carries_its_rate_in_whole_percent(int runs, int wins, string expected) =>
-        Assert.Equal(expected, Format.Record(new Tally(runs, wins)));
+    [InlineData(50, 13, "26%")]
+    [InlineData(347, 83, "24%")]
+    [InlineData(4, 4, "100%")]
+    [InlineData(4, 0, "0%")]
+    public void A_rate_column_reads_in_whole_percent(int runs, int wins, string expected) =>
+        Assert.Equal(expected, Format.WholePercent(new Tally(runs, wins)));
+
+    [Fact]
+    public void The_overview_keeps_one_decimal_where_a_single_rate_is_the_headline()
+    {
+        var tally = new Tally(347, 83);
+
+        Assert.Equal("23.9%", Format.Percent(tally));
+        Assert.Equal("24%", Format.WholePercent(tally));
+    }
 
     [Theory]
     [InlineData(0, true, "none")]

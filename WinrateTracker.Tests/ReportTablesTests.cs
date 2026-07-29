@@ -91,23 +91,36 @@ public class ReportTablesTests
     {
         var section = Section(ReportTab.Splits, Report(new string('L', 10) + new string('W', 10)), "10-run blocks");
 
+        // A block of ten needs no win% column of its own.
         Assert.Equal(
-            ["block", "from", "to", "record", "overall%"],
+            ["block", "from", "to", "W-L", "overall%"],
             section.Columns.Select(column => column.Header));
-        Assert.Equal(["11-20", "01-11", "01-20", "10-0 (100%)", "50.0%"], section.Rows[0]);
-        Assert.Equal(["1-10", "01-01", "01-10", "0-10 (0%)", "0.0%"], section.Rows[1]);
+        Assert.Equal(["11-20", "01-11", "01-20", "10-0", "50.0%"], section.Rows[0]);
+        Assert.Equal(["1-10", "01-01", "01-10", "0-10", "0.0%"], section.Rows[1]);
     }
 
     [Fact]
-    public void Both_block_tables_use_the_same_columns()
+    public void Fifty_run_blocks_carry_their_own_rate_where_ten_run_blocks_do_not()
     {
         var sections = ReportTables.Build(ReportTab.Splits, Report(new string('W', 60)));
 
         var ten = Assert.Single(sections, section => section.Title == "10-run blocks");
         var fifty = Assert.Single(sections, section => section.Title == "50-run blocks");
+
+        Assert.DoesNotContain("win%", ten.Columns.Select(column => column.Header));
+        Assert.Contains("win%", fifty.Columns.Select(column => column.Header));
+    }
+
+    [Fact]
+    public void Records_and_rates_live_in_separate_columns()
+    {
+        var section = Section(ReportTab.Splits, Report(new string('W', 60)), "By patch");
+
         Assert.Equal(
-            ten.Columns.Select(column => column.Header),
-            fifty.Columns.Select(column => column.Header));
+            ["patch", "from", "to", "W-L", "win%", "overall%"],
+            section.Columns.Select(column => column.Header));
+        // No bracketed rate stowed inside the record cell.
+        Assert.All(section.Rows, row => Assert.DoesNotContain("(", row[3]));
     }
 
     [Fact]
@@ -182,19 +195,33 @@ public class ReportTablesTests
 
         var section = Section(ReportTab.Characters, WinrateReport.Build(runs), "Month by character");
 
-        Assert.Equal(["month", "Ironclad", "Silent"], section.Columns.Select(column => column.Header));
-        Assert.Equal(["Feb 2026", "—", "0-1 (0%)"], section.Rows[0]);
-        Assert.Equal(["Jan 2026", "1-0 (100%)", "—"], section.Rows[1]);
+        // One name per character, over a record column and a rate column.
+        Assert.Equal(["", "Ironclad", "", "Silent", ""], section.GroupHeaders);
+        Assert.Equal(["month", "W-L", "win%", "W-L", "win%"], section.Columns.Select(column => column.Header));
+        Assert.Equal(["Feb 2026", "—", "—", "0-1", "0%"], section.Rows[0]);
+        Assert.Equal(["Jan 2026", "1-0", "100%", "—", "—"], section.Rows[1]);
     }
 
     [Fact]
-    public void The_character_table_shows_records_with_their_rates_and_no_average_act()
+    public void The_character_table_splits_each_record_from_its_rate()
     {
         var section = Section(ReportTab.Characters, Report("WLWL"), "By character");
 
+        Assert.Equal(["", "", "all time", "", "last 50", "", "last 10"], section.GroupHeaders);
         Assert.Equal(
-            ["character", "runs", "all time", "last 50", "last 10"],
+            ["character", "runs", "W-L", "win%", "W-L", "win%", "W-L"],
             section.Columns.Select(column => column.Header));
-        Assert.Equal(["Ironclad", "4", "2-2 (50%)", "2-2 (50%)", "2-2 (50%)"], section.Rows[0]);
+        Assert.Equal(["Ironclad", "4", "2-2", "50%", "2-2", "50%", "2-2"], section.Rows[0]);
+    }
+
+    [Fact]
+    public void A_group_header_row_has_one_entry_per_column()
+    {
+        var report = Report("WLLWLWLLLWLLWLLLWLLWLLLWWLWL");
+
+        foreach (var tab in AllTabs)
+        foreach (var section in ReportTables.Build(tab, report))
+            if (section.GroupHeaders is { } groups)
+                Assert.Equal(section.Columns.Count, groups.Count);
     }
 }

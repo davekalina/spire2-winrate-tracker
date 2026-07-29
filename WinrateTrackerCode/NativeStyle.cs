@@ -137,7 +137,12 @@ internal static class NativeStyle
     /// <summary>
     /// A small labelled button, built from the game's settings tab — the one native
     /// scene that is a self-contained, focusable button carrying a label it will set for
-    /// you. Its own scene sizes it for a tab row, so it is scaled down here.
+    /// you.
+    ///
+    /// The scene sizes itself for a tab row and draws its label at 32 px. Shrinking the
+    /// frame alone leaves the text overflowing it, because the label is anchored to the
+    /// frame and MegaLabel will not shrink text below the scene's own floor. So the font
+    /// is stepped down with the frame.
     /// </summary>
     public static Control TextButton(string text, Action onPressed)
     {
@@ -146,6 +151,12 @@ internal static class NativeStyle
         button.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         button.Ready += () =>
         {
+            if (button.GetNodeOrNull<MegaLabel>("Label") is { } label)
+            {
+                label.MinFontSize = ButtonFontSize;
+                label.MaxFontSize = ButtonFontSize;
+                label.AddThemeFontSizeOverride("font_size", ButtonFontSize);
+            }
             button.SetLabel(text);
             // Tabs open deselected, which reads as "off" on a plain button.
             button.Select();
@@ -156,8 +167,22 @@ internal static class NativeStyle
         return button;
     }
 
-    /// <summary>Roughly two-thirds of a settings tab, which is sized for a tab row.</summary>
-    private static readonly Vector2 ButtonSize = new(180, 58);
+    /// <summary>Wide enough for "Show Graph" at <see cref="ButtonFontSize" />.</summary>
+    private static readonly Vector2 ButtonSize = new(224, 64);
+
+    private const int ButtonFontSize = 22;
+
+    /// <summary>
+    /// A heading over a span of columns, dimmer than the column headers under it so the
+    /// two rows read as a hierarchy rather than as two competing header rows.
+    /// </summary>
+    public static MegaLabel GroupHeaderCell(string text, bool rightAligned)
+    {
+        var label = Label(text, ColumnHeaderFontSize + 2, HeaderColor, bold: true);
+        label.HorizontalAlignment = rightAligned ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+        label.SizeFlagsHorizontal = rightAligned ? Control.SizeFlags.ExpandFill : Control.SizeFlags.Fill;
+        return label;
+    }
 
     /// <summary>The translucent panel a table sits on, with the native insets applied.</summary>
     public static MarginContainer Panel(Control content)

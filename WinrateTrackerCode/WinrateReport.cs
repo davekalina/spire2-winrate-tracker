@@ -45,8 +45,11 @@ internal sealed record CharacterRow(string Character, Tally All, Tally Last10, T
 
 internal sealed record CountRow(string Label, int Count);
 
-/// <summary>A labelled row of pre-formatted cells, for the character-by-month grid.</summary>
-internal sealed record MatrixRow(string Label, IReadOnlyList<string> Cells);
+/// <summary>
+/// A labelled row of the month-by-character grid. A null cell is a month that character
+/// did not play — kept as null rather than a zero tally so the table can say so.
+/// </summary>
+internal sealed record MatrixRow(string Label, IReadOnlyList<Tally?> Cells);
 
 /// <summary>How many runs a trailing window covers, and how they went.</summary>
 internal sealed record WindowRow(int Window, Tally Tally);
@@ -271,14 +274,16 @@ internal sealed record WinrateReport
         {
             var cells = characters
                 .Select(character => byMonthCharacter.TryGetValue((month, character), out var tally)
-                    ? Format.Record(tally)
-                    : Format.Empty)
+                    ? tally
+                    : (Tally?)null)
                 .ToList();
             rows.Add(new MatrixRow(Format.MonthName(month), cells));
         }
 
         var byCharacter = runs.GroupBy(run => run.Character).ToDictionary(group => group.Key, Tally.Of);
-        rows.Add(new MatrixRow("Total", characters.Select(character => Format.Record(byCharacter[character])).ToList()));
+        rows.Add(new MatrixRow(
+            "Total",
+            characters.Select(character => (Tally?)byCharacter[character]).ToList()));
         return rows;
     }
 

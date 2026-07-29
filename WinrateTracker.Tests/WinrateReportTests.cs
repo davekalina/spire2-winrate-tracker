@@ -317,10 +317,10 @@ public class WinrateReportTests
 
         Assert.Equal(["Ironclad", "Silent"], report.MatrixCharacters);
         Assert.Equal(["Feb 2026", "Jan 2026", "Total"], report.MonthByCharacter.Select(row => row.Label));
-        // Silent never played in February.
-        Assert.Equal(["0-1 (0%)", "—"], report.MonthByCharacter[0].Cells);
-        Assert.Equal(["1-0 (100%)", "0-1 (0%)"], report.MonthByCharacter[1].Cells);
-        Assert.Equal(["1-1 (50%)", "0-1 (0%)"], report.MonthByCharacter[2].Cells);
+        // Silent never played in February, which stays null rather than becoming 0-0.
+        Assert.Equal([new Tally(1, 0), null], report.MonthByCharacter[0].Cells);
+        Assert.Equal([new Tally(1, 1), new Tally(1, 0)], report.MonthByCharacter[1].Cells);
+        Assert.Equal([new Tally(2, 1), new Tally(1, 0)], report.MonthByCharacter[2].Cells);
     }
 
     // ── deaths ───────────────────────────────────────────────────────────────

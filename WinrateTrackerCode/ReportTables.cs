@@ -16,6 +16,13 @@ internal sealed record TableSection(
     IReadOnlyList<IReadOnlyList<string>> Rows,
     IReadOnlyList<SeriesPoint>? Series = null)
 {
+    /// <summary>
+    /// An optional row above the column headers, one entry per column, blank where a
+    /// column has no group. It lets a pair of columns sit under one heading — the
+    /// month-by-character grid gives each character one name over its record and rate.
+    /// </summary>
+    public IReadOnlyList<string>? GroupHeaders { get; init; }
+
     public bool IsEmpty => Rows.Count == 0;
 
     /// <summary>Whether this table has something worth plotting.</summary>
@@ -109,7 +116,9 @@ internal static class ReportTables
         [
             PeriodSection("By month", report.Months, "month", withFloors: true),
             PeriodSection("By patch", report.Patches, "patch"),
-            PeriodSection("10-run blocks", report.Blocks10, "block"),
+            // A block of exactly ten runs needs no win% column: the record is the rate
+            // with a zero after it.
+            PeriodSection("10-run blocks", report.Blocks10, "block", withOwnRate: false),
             PeriodSection("50-run blocks", report.Blocks50, "block"),
         ];
     }
@@ -118,16 +127,19 @@ internal static class ReportTables
         string title,
         IReadOnlyList<PeriodRow> periods,
         string labelHeader,
-        bool withFloors = false)
+        bool withFloors = false,
+        bool withOwnRate = true)
     {
         List<TableColumn> columns =
         [
             new(labelHeader),
             new("from", RightAligned: true),
             new("to", RightAligned: true),
-            new("record", RightAligned: true),
-            new("overall%", RightAligned: true),
+            new("W-L", RightAligned: true),
         ];
+        if (withOwnRate)
+            columns.Add(new TableColumn("win%", RightAligned: true));
+        columns.Add(new TableColumn("overall%", RightAligned: true));
         if (withFloors)
             columns.Add(new TableColumn("avg floors", RightAligned: true));
 
@@ -138,9 +150,11 @@ internal static class ReportTables
                 period.Label,
                 Format.ShortDate(period.From),
                 Format.ShortDate(period.To),
-                Format.Record(period.Tally),
-                Format.Percent(period.CumulativeWinRate),
+                Format.WinLoss(period.Tally),
             ];
+            if (withOwnRate)
+                cells.Add(Format.WholePercent(period.Tally));
+            cells.Add(Format.Percent(period.CumulativeWinRate));
             if (withFloors)
                 cells.Add(Format.Average(period.AverageFloors));
             return (IReadOnlyList<string>)cells;
@@ -165,28 +179,55 @@ internal static class ReportTables
             [
                 new TableColumn("character"),
                 new TableColumn("runs", RightAligned: true),
-                new TableColumn("all time", RightAligned: true),
-                new TableColumn("last 50", RightAligned: true),
-                new TableColumn("last 10", RightAligned: true),
+                new TableColumn("W-L", RightAligned: true),
+                new TableColumn("win%", RightAligned: true),
+                new TableColumn("W-L", RightAligned: true),
+                new TableColumn("win%", RightAligned: true),
+                // Ten runs needs no rate column, for the same reason the 10-run blocks
+                // table does without one.
+                new TableColumn("W-L", RightAligned: true),
             ],
             report.Characters.Select(row => (IReadOnlyList<string>)
             [
                 row.Character,
                 Format.Count(row.All.Runs),
-                Format.Record(row.All),
-                Format.Record(row.Last50),
-                Format.Record(row.Last10),
-            ]).ToList());
+                Format.WinLoss(row.All),
+                Format.WholePercent(row.All),
+                Format.WinLoss(row.Last50),
+                Format.WholePercent(row.Last50),
+                Format.WinLoss(row.Last10),
+            ]).ToList())
+        {
+            GroupHeaders = ["", "", "all time", "", "last 50", "", "last 10"],
+        };
 
+        // Each character gets one name over a record column and a rate column.
         var columns = new List<TableColumn> { new("month") };
-        columns.AddRange(report.MatrixCharacters.Select(character => new TableColumn(character, RightAligned: true)));
+        var groups = new List<string> { "" };
+        foreach (var character in report.MatrixCharacters)
+        {
+            columns.Add(new TableColumn("W-L", RightAligned: true));
+            columns.Add(new TableColumn("win%", RightAligned: true));
+            groups.Add(character);
+            groups.Add("");
+        }
 
         var matrix = new TableSection(
             "Month by character",
             columns,
-            report.MonthByCharacter
-                .Select(row => (IReadOnlyList<string>)new[] { row.Label }.Concat(row.Cells).ToList())
-                .ToList());
+            report.MonthByCharacter.Select(row =>
+            {
+                var cells = new List<string> { row.Label };
+                foreach (var tally in row.Cells)
+                {
+                    cells.Add(tally is { } played ? Format.WinLoss(played) : Format.Empty);
+                    cells.Add(tally is { } rate ? Format.WholePercent(rate) : Format.Empty);
+                }
+                return (IReadOnlyList<string>)cells;
+            }).ToList())
+        {
+            GroupHeaders = groups,
+        };
 
         return [byCharacter, matrix];
     }
