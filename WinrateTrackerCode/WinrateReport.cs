@@ -268,7 +268,7 @@ internal sealed record WinrateReport
 
         var months = runs.Select(run => run.Month)
             .Distinct()
-            .OrderByDescending(month => month, StringComparer.Ordinal);
+            .OrderBy(month => month, StringComparer.Ordinal);
 
         foreach (var month in months)
         {

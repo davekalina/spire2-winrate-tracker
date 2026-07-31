@@ -21,10 +21,10 @@ internal sealed class GraphPopup
 {
     private const float PanelWidth = 1480f;
     private const float PanelHeight = 760f;
-    private const float PlotInsetLeft = 128f;
-    private const float PlotInsetRight = 128f;
-    private const float PlotInsetTop = 152f;
-    private const float PlotInsetBottom = 152f;
+    private const float PlotInsetLeft = ModalPanel.ContentInsetLeft;
+    private const float PlotInsetRight = ModalPanel.ContentInsetRight;
+    private const float PlotInsetTop = ModalPanel.ContentInsetTop;
+    private const float PlotInsetBottom = ModalPanel.ContentInsetBottom;
 
     /// <summary>Share of each slot the bar fills, leaving the rest as breathing room.</summary>
     private const float BarFill = 0.62f;
@@ -45,10 +45,10 @@ internal sealed class GraphPopup
     private static readonly Color GridColor = new(1f, 1f, 1f, 0.10f);
     private static readonly Color AxisColor = new(1f, 1f, 1f, 0.28f);
 
-    private readonly Control _root;
+    private readonly ModalPanel _modal;
     private Tooltip? _tooltip;
 
-    private GraphPopup(Control root) => _root = root;
+    private GraphPopup(ModalPanel modal) => _modal = modal;
 
     /// <summary>
     /// Show <paramref name="section" />'s series over <paramref name="host" />, replacing
@@ -56,75 +56,18 @@ internal sealed class GraphPopup
     /// </summary>
     public static GraphPopup Show(Control host, TableSection section)
     {
-        var backdrop = new ColorRect
-        {
-            Name = "WinrateGraphPopup",
-            Color = StsColors.screenBackdrop,
-            // Stop, so the table underneath cannot be clicked through the graph.
-            MouseFilter = Control.MouseFilterEnum.Stop,
-        };
-        backdrop.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        host.AddChild(backdrop);
+        var modal = ModalPanel.Open(host, section.Title, PanelWidth, PanelHeight);
+        var popup = new GraphPopup(modal);
 
-        var popup = new GraphPopup(backdrop);
-        // Clicking away is the dismissal people try first, so it works before they find
-        // the button.
-        backdrop.Connect(
-            Control.SignalName.GuiInput,
-            Callable.From<InputEvent>(input =>
-            {
-                if (input is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true })
-                    popup.Close();
-            }));
+        modal.Panel.AddChild(Caption("wins per period", BarTopColor, new Vector2(PlotInsetLeft, 88f)));
+        modal.Panel.AddChild(Caption("win rate cumulative", LineColor, new Vector2(PlotInsetLeft + 280f, 88f)));
 
-        backdrop.AddChild(popup.BuildPanel(section));
+        popup.BuildPlot(modal.Content, section.Series!);
+        popup._tooltip = new Tooltip(modal.Panel);
         return popup;
     }
 
-    public void Close()
-    {
-        if (GodotObject.IsInstanceValid(_root))
-            _root.QueueFree();
-    }
-
-    private Control BuildPanel(TableSection section)
-    {
-        var panel = new Control
-        {
-            CustomMinimumSize = new Vector2(PanelWidth, PanelHeight),
-            // Stop, so a click on the panel does not reach the backdrop and close it.
-            MouseFilter = Control.MouseFilterEnum.Stop,
-        };
-        panel.SetAnchorsPreset(Control.LayoutPreset.Center);
-        panel.OffsetLeft = -PanelWidth / 2f;
-        panel.OffsetRight = PanelWidth / 2f;
-        panel.OffsetTop = -PanelHeight / 2f;
-        panel.OffsetBottom = PanelHeight / 2f;
-
-        var background = new ColorRect
-        {
-            Color = NativeStyle.PanelColor with { A = 0.98f },
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        };
-        background.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        panel.AddChild(background);
-
-        var title = NativeStyle.Header(section.Title);
-        title.Position = new Vector2(PlotInsetLeft, 26f);
-        panel.AddChild(title);
-
-        panel.AddChild(Caption("wins per period", BarTopColor, new Vector2(PlotInsetLeft, 88f)));
-        panel.AddChild(Caption("win rate overall", LineColor, new Vector2(PlotInsetLeft + 260f, 88f)));
-
-        var close = NativeStyle.TextButton("Close", Close);
-        close.Position = new Vector2(PanelWidth - PlotInsetRight - 224f, 22f);
-        panel.AddChild(close);
-
-        panel.AddChild(BuildPlot(section.Series!));
-
-        _tooltip = new Tooltip(panel);
-        return panel;
-    }
+    public void Close() => _modal.Close();
 
     private static MegaLabel Caption(string text, Color color, Vector2 position)
     {
@@ -134,15 +77,8 @@ internal sealed class GraphPopup
         return label;
     }
 
-    private Control BuildPlot(IReadOnlyList<SeriesPoint> series)
+    private void BuildPlot(Control plot, IReadOnlyList<SeriesPoint> series)
     {
-        var plot = new Control { MouseFilter = Control.MouseFilterEnum.Ignore };
-        plot.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        plot.OffsetLeft = PlotInsetLeft;
-        plot.OffsetRight = -PlotInsetRight;
-        plot.OffsetTop = PlotInsetTop;
-        plot.OffsetBottom = -PlotInsetBottom;
-
         var width = PanelWidth - PlotInsetLeft - PlotInsetRight;
         var height = PanelHeight - PlotInsetTop - PlotInsetBottom;
 
@@ -204,7 +140,6 @@ internal sealed class GraphPopup
 
         AddAxisLabels(plot, series, slot, height);
         AddHoverTargets(plot, series, slot, height, bars);
-        return plot;
     }
 
     private static Vector2 PointAt(IReadOnlyList<SeriesPoint> series, int index, float slot, float height) =>
@@ -358,8 +293,9 @@ internal sealed class GraphPopup
     /// </summary>
     private sealed class Tooltip
     {
-        private const float Width = 300f;
-        private const float Height = 132f;
+        private const float PaddingX = 18f;
+        private const float PaddingY = 12f;
+        private const float LineHeight = NativeStyle.CellFontSize + 8f;
         private const float Margin = 20f;
 
         private readonly Control _panel;
@@ -369,12 +305,10 @@ internal sealed class GraphPopup
         {
             _panel = new Control
             {
-                CustomMinimumSize = new Vector2(Width, Height),
                 MouseFilter = Control.MouseFilterEnum.Ignore,
                 Visible = false,
                 ZIndex = 10,
             };
-            _panel.Size = new Vector2(Width, Height);
 
             var background = new ColorRect
             {
@@ -385,7 +319,7 @@ internal sealed class GraphPopup
             _panel.AddChild(background);
 
             _label = NativeStyle.Cell("", rightAligned: false);
-            _label.Position = new Vector2(16f, 12f);
+            _label.Position = new Vector2(PaddingX, PaddingY);
             _panel.AddChild(_label);
 
             host.AddChild(_panel);
@@ -397,19 +331,30 @@ internal sealed class GraphPopup
                 return;
 
             var tally = new Tally(point.Runs, point.Wins);
-            _label.Text = string.Join(
-                '\n',
+            string[] lines =
+            [
                 point.Label,
                 $"{point.Runs} runs · {Format.WinLoss(tally)}",
                 $"win rate {Format.WholePercent(tally)}",
-                $"overall {Format.Percent(point.CumulativeWinRate)}");
+                $"cumulative {Format.Percent(point.CumulativeWinRate)}",
+            ];
+            _label.Text = string.Join('\n', lines);
+
+            // Sized to the text it is actually showing. A fixed box either clips the
+            // longest reading or leaves a slab of empty panel beside the shortest.
+            var size = new Vector2(
+                lines.Max(NativeStyle.MeasureCell) + PaddingX * 2f,
+                lines.Length * LineHeight + PaddingY * 2f);
+            _panel.CustomMinimumSize = size;
+            _panel.Size = size;
 
             // Follows the cursor, clamped so it never hangs off the panel.
-            var mouse = _panel.GetParent<Control>().GetLocalMousePosition();
-            var bounds = _panel.GetParent<Control>().Size;
+            var host = _panel.GetParent<Control>();
+            var mouse = host.GetLocalMousePosition();
+            var bounds = host.Size;
             _panel.Position = new Vector2(
-                Math.Clamp(mouse.X + Margin, 0, Math.Max(0, bounds.X - Width)),
-                Math.Clamp(mouse.Y + Margin, 0, Math.Max(0, bounds.Y - Height)));
+                Math.Clamp(mouse.X + Margin, 0, Math.Max(0, bounds.X - size.X)),
+                Math.Clamp(mouse.Y + Margin, 0, Math.Max(0, bounds.Y - size.Y)));
             _panel.Visible = true;
         }
 

@@ -14,7 +14,7 @@ Three tabs, cycled with the controller triggers like the native Statistics scree
 | --- | --- |
 | **Overview** | Record, win rate, current and longest streak, a rolling win rate over the last 10/25/50/100 runs, which act you lose in, and what kills you |
 | **Splits** | The same archive cut four ways — by month, by patch, and into 10-run and 50-run blocks — each newest first, each carrying its own record and the cumulative win rate as of its end |
-| **Characters** | Per-character record all time, over the last 50, and over the last 10 — plus a month-by-character grid |
+| **Characters** | Per-character record all time, over the last 50, and over the last 10 — plus a character-by-month grid |
 
 Every table on **Splits** has a **Show Graph** button: a bar per period for the wins in
 it, with the all-time win rate drawn over the top. Close it with its button or by
@@ -24,7 +24,7 @@ Patches group by minor version, so a patch and its hotfixes (`v0.108.0`, `v0.108
 report as one line rather than two small samples.
 
 A filter row above the tabs narrows the whole screen by **ascension**, by **character**,
-and by **time window** (all time, or the last 30/60/90 days). It opens on Ascension 10,
+and by **time window** (all time, or the last 7/14/30/45/60/90/120 days). It opens on Ascension 10,
 every character, all time, and remembers what you chose until the game closes. The window
 is measured back from your most recent run rather than from the clock, so it does not
 quietly empty itself while the game is left open.
@@ -34,7 +34,7 @@ quietly empty itself while the game is left open.
 An abandoned run counts as a loss. Quitting a run you were losing is not a different
 outcome from losing it, and letting abandons vanish is the easiest way to flatter a win
 rate without noticing. The exception is an abandon on the first floor, which is a reroll
-rather than a run — **Settings → Mod Settings → Ignore floor-1 abandons** drops those,
+rather than a run — the **gear beside the tabs** (or Settings → Mod Settings) drops those,
 and is on by default.
 
 Two rules are not adjustable and are stated on the screen. Co-op runs are always
@@ -69,7 +69,7 @@ Building copies `WinrateTracker.json`, `WinrateTracker.dll`, and `WinrateTracker
 Close the game first, or the DLL will be locked.
 
 Runtime diagnostics are in `%APPDATA%\SlayTheSpire2\logs\godot.log`. A successful start
-logs `Winrate Tracker v0.4.1 initialized`.
+logs `Winrate Tracker v0.5.0 initialized`.
 
 ## Publish to the Steam Workshop
 

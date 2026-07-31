@@ -14,14 +14,20 @@ public partial class MainFile : Node
     /// </summary>
     public const string ModId = "WinrateTracker";
 
+    /// <summary>Display name. Shown on the screen's byline.</summary>
+    public const string ModName = "Winrate Tracker";
+
+    /// <summary>Keep in step with the manifest version.</summary>
+    public const string Version = "v0.5.0";
+
+    public const string Author = "realtruegravy";
+
     public static MegaCrit.Sts2.Core.Logging.Logger Logger { get; } =
         new(ModId, MegaCrit.Sts2.Core.Logging.LogType.Generic);
 
     public static void Initialize()
     {
         new Harmony(ModId).PatchAll();
-
-        // Keep this string in sync with the manifest version.
-        Logger.Info("Winrate Tracker v0.4.1 initialized.");
+        Logger.Info($"{ModName} {Version} initialized.");
     }
 }

@@ -182,6 +182,52 @@ internal static class NativeStyle
 
     private const int ButtonFontSize = 22;
 
+    /// <summary>
+    /// A square icon button carrying one of the game's own textures. Built on the same
+    /// settings tab as <see cref="TextButton" /> so it hovers and focuses identically,
+    /// with the label left empty and the icon laid over it.
+    /// </summary>
+    public static Control IconButton(string texturePath, float size, Action onPressed)
+    {
+        var button = SceneHelper.Instantiate<NSettingsTab>("screens/settings_tab");
+        button.CustomMinimumSize = new Vector2(size, size);
+        button.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        button.Ready += () =>
+        {
+            button.SetLabel("");
+            button.Select();
+        };
+
+        var icon = new TextureRect
+        {
+            Texture = GD.Load<Texture2D>(texturePath),
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        icon.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        icon.OffsetLeft = IconInset;
+        icon.OffsetTop = IconInset;
+        icon.OffsetRight = -IconInset;
+        icon.OffsetBottom = -IconInset;
+        button.AddChild(icon);
+
+        button.Connect(
+            NClickableControl.SignalName.Released,
+            Callable.From<NClickableControl>(_ => onPressed()));
+        return button;
+    }
+
+    private const float IconInset = 14f;
+
+    /// <summary>The mod's byline, in the dimmed cream used for secondary text.</summary>
+    public static MegaLabel Byline(string text)
+    {
+        var label = Label(text, NoteFontSize, NoteColor, bold: false);
+        label.MouseFilter = Control.MouseFilterEnum.Ignore;
+        return label;
+    }
+
     /// <summary>How wide a cell's text is in the body font. Drives part alignment.</summary>
     public static float MeasureCell(string text) =>
         string.IsNullOrEmpty(text)

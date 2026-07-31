@@ -198,15 +198,15 @@ public class ReportTablesTests
             Run(Unix(2026, 2, 5), character: "Silent"),
         };
 
-        var section = Section(ReportTab.Characters, WinrateReport.Build(runs), "Month by character");
+        var section = Section(ReportTab.Characters, WinrateReport.Build(runs), "Character by Month");
 
         // One column per character, its record and rate paired inside it.
         Assert.Equal(["month", "Ironclad", "Silent"], section.Columns.Select(column => column.Header));
-        Assert.Equal(["Ironclad", "Silent"], section.Columns.Skip(1).Select(column => column.Header));
-        Assert.Equal(["0-1", "0%"], section.Rows[0][2].Parts);
-        Assert.Equal(["1-0", "100%"], section.Rows[1][1].Parts);
+        Assert.Equal(["Jan 2026", "Feb 2026", "Total"], section.Rows.Select(row => row[0].Text));
+        Assert.Equal(["1-0", "100%"], section.Rows[0][1].Parts);
+        Assert.Equal(["0-1", "0%"], section.Rows[1][2].Parts);
         // A month a character did not play reads as a dash with no rate beside it.
-        Assert.Equal(["—", ""], section.Rows[0][1].Parts);
+        Assert.Equal(["—", ""], section.Rows[1][1].Parts);
     }
 
     [Fact]

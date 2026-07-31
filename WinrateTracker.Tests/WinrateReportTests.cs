@@ -316,10 +316,12 @@ public class WinrateReportTests
         var report = WinrateReport.Build(runs);
 
         Assert.Equal(["Ironclad", "Silent"], report.MatrixCharacters);
-        Assert.Equal(["Feb 2026", "Jan 2026", "Total"], report.MonthByCharacter.Select(row => row.Label));
+        // Oldest month first, unlike the period tables: this one is read as a trend down
+        // the page rather than as "what happened lately".
+        Assert.Equal(["Jan 2026", "Feb 2026", "Total"], report.MonthByCharacter.Select(row => row.Label));
+        Assert.Equal([new Tally(1, 1), new Tally(1, 0)], report.MonthByCharacter[0].Cells);
         // Silent never played in February, which stays null rather than becoming 0-0.
-        Assert.Equal([new Tally(1, 0), null], report.MonthByCharacter[0].Cells);
-        Assert.Equal([new Tally(1, 1), new Tally(1, 0)], report.MonthByCharacter[1].Cells);
+        Assert.Equal([new Tally(1, 0), null], report.MonthByCharacter[1].Cells);
         Assert.Equal([new Tally(2, 1), new Tally(1, 0)], report.MonthByCharacter[2].Cells);
     }
 

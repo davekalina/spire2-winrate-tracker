@@ -34,8 +34,11 @@ internal static class NativeTable
         if (onShowGraph is null || !section.IsGraphable)
             return header;
 
-        var row = new HBoxContainer();
+        var row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Pass };
         row.AddThemeConstantOverride("separation", 24);
+        // The heading takes the slack so the button sits against the right edge of every
+        // section, rather than trailing whatever the title happens to be called.
+        header.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         header.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         row.AddChild(header);
         row.AddChild(NativeStyle.TextButton("Show Graph", () => onShowGraph(section)));

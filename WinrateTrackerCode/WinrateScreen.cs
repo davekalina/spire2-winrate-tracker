@@ -52,6 +52,16 @@ internal sealed class WinrateScreen : IDisposable
     /// <summary>How much of the screen the content takes to dissolve, as a fraction.</summary>
     private const float FadeDepth = 0.05f;
 
+    /// <summary>Clearance between the filter row and the top of the scrollbar.</summary>
+    private const float ScrollbarGap = 24f;
+
+    private const float GearSize = 64f;
+    private const float BylineLeft = 64f;
+    private const float BylineBottom = 48f;
+
+    private static readonly string GearIconPath =
+        ImageHelper.GetImagePath("atlases/ui_atlas.sprites/top_bar/top_bar_settings.tres");
+
     private static WinrateScreen? _current;
 
     private readonly NStatsScreen _screen;
@@ -62,6 +72,7 @@ internal sealed class WinrateScreen : IDisposable
     private VBoxContainer _content = null!;
     private MegaLabel _summary = null!;
     private GraphPopup? _graph;
+    private SettingsPopup? _settings;
 
     private WinrateScreen(NSubmenuStack stack)
     {
@@ -131,8 +142,58 @@ internal sealed class WinrateScreen : IDisposable
 
         ReplaceNativeContent();
         RaiseContentFade();
+        LowerScrollbar();
+        AddGearButton(tabContainer);
+        _screen.AddChild(BuildByline());
         // Added last so the filter row sits above the scroll body in draw order.
         _screen.AddChild(BuildFilterRow());
+    }
+
+    /// <summary>
+    /// Drop the scrollbar below the filter row. The scene anchors it for a screen whose
+    /// content starts under the tabs; this one has a header strip in between, and the
+    /// scrollbar was running up behind it.
+    /// </summary>
+    private void LowerScrollbar()
+    {
+        if (_screen.GetNodeOrNull<Control>("%StatsGrid/ScrollableContent/Scrollbar") is not { } scrollbar)
+            return;
+        scrollbar.OffsetTop = FilterRowTop + FilterRowHeight + ScrollbarGap;
+    }
+
+    /// <summary>
+    /// The gear, at the end of the tab row. The same settings are in Settings → Mod
+    /// Settings, but a setting that changes what the table in front of you counts should
+    /// not require leaving the table to reach.
+    /// </summary>
+    private void AddGearButton(Control tabContainer)
+    {
+        if (tabContainer.GetParent() is not Control tabRow)
+            return;
+        tabRow.AddChild(NativeStyle.IconButton(GearIconPath, GearSize, ShowSettings));
+    }
+
+    private void ShowSettings()
+    {
+        _settings?.Close();
+        _settings = SettingsPopup.Show(_screen);
+    }
+
+    /// <summary>
+    /// Whose mod this is, under the back button. Small and dim: it should be findable
+    /// when wanted and invisible when not.
+    /// </summary>
+    private static Control BuildByline()
+    {
+        var label = NativeStyle.Byline($"{MainFile.ModName} {MainFile.Version} by {MainFile.Author}");
+        label.SetAnchorsPreset(Control.LayoutPreset.BottomLeft);
+        label.AnchorTop = 1f;
+        label.AnchorBottom = 1f;
+        label.OffsetLeft = BylineLeft;
+        label.OffsetTop = -BylineBottom;
+        label.OffsetBottom = -BylineBottom + 28f;
+        label.GrowVertical = Control.GrowDirection.Begin;
+        return label;
     }
 
     private static int TabCount => Enum.GetValues<ReportTab>().Length;

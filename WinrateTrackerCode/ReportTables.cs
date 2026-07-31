@@ -211,7 +211,7 @@ internal static class ReportTables
         columns.AddRange(report.MatrixCharacters.Select(character => new TableColumn(character, RightAligned: true)));
 
         var matrix = new TableSection(
-            "Month by character",
+            "Character by Month",
             columns,
             report.MonthByCharacter.Select(row =>
             {

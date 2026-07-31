@@ -43,9 +43,13 @@ internal sealed class FilterBar
     private static readonly (string Text, int? Days)[] Windows =
     [
         ("All", null),
+        ("Last 7 days", 7),
+        ("Last 14 days", 14),
         ("Last 30 days", 30),
+        ("Last 45 days", 45),
         ("Last 60 days", 60),
         ("Last 90 days", 90),
+        ("Last 120 days", 120),
     ];
 
     private readonly Cycler _ascension;
