@@ -86,3 +86,12 @@ between this repository and the published Workshop item.
 
 See `docs/sts2-modding.md` for the full pipeline and `workshop/README.md` for the
 `workshop.json` field reference.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE).
+
+That covers this mod's own source. It does not cover Slay the Spire 2, which is the
+property of Mega Crit. The mod compiles against the game's assemblies and loads the
+game's own scenes and textures at runtime from the player's installed copy; none of
+that is redistributed here.
