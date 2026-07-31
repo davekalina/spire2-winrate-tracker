@@ -53,14 +53,23 @@ internal sealed class WinrateScreen : IDisposable
     private const float FadeDepth = 0.05f;
 
     /// <summary>Clearance between the filter row and the top of the scrollbar.</summary>
-    private const float ScrollbarGap = 24f;
+    private const float ScrollbarGap = 36f;
 
     /// <summary>Matches the game's own top-bar gear, which is drawn at 64 px.</summary>
     private const float GearSize = 64f;
 
-    private const float BylineLeft = 64f;
-    private const float BylineBottom = 56f;
-    private const float BylineWidth = 420f;
+    /// <summary>
+    /// Byline placement, in the bottom-left corner under the back button — which the
+    /// scene anchors at x -40 with a 40 px inset on its ribbon, so 24 lines up with the
+    /// arrow's left edge.
+    ///
+    /// The width matters: the content column starts at <see cref="ContentMarginLeft" />,
+    /// and a byline box wide enough to reach it will sit over the tables.
+    /// </summary>
+    private const float BylineLeft = 24f;
+
+    private const float BylineWidth = ContentMarginLeft - BylineLeft - 8f;
+    private const float BylineBottom = 40f;
     private const float BylineHeight = 52f;
 
     private static readonly string GearIconPath =
@@ -206,9 +215,12 @@ internal sealed class WinrateScreen : IDisposable
         label.AnchorBottom = 1f;
         label.OffsetLeft = BylineLeft;
         label.OffsetRight = BylineLeft + BylineWidth;
-        label.OffsetTop = -BylineBottom;
-        label.OffsetBottom = -BylineBottom + BylineHeight;
+        // Both offsets are measured up from the bottom edge, so the box sits above it
+        // rather than half over the edge.
+        label.OffsetTop = -(BylineBottom + BylineHeight);
+        label.OffsetBottom = -BylineBottom;
         label.GrowVertical = Control.GrowDirection.Begin;
+        label.VerticalAlignment = VerticalAlignment.Bottom;
         return label;
     }
 
