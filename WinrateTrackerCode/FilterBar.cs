@@ -217,6 +217,11 @@ internal sealed class FilterBar
                 GrowVertical = scripted.GrowVertical,
                 MouseFilter = Control.MouseFilterEnum.Stop,
                 MouseDefaultCursorShape = Control.CursorShape.PointingHand,
+                // v0.110 moved the arrows into their own scene, where the image is drawn
+                // with use_parent_material — it takes its shader from the arrow, not from
+                // itself. Reparenting the image onto a bare Control would drop that
+                // shader, so the arrow's material comes across too.
+                Material = scripted.Material,
             };
 
             scripted.RemoveChild(image);
