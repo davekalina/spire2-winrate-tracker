@@ -1,6 +1,6 @@
 {
   "title": "Winrate Tracker",
-  "description": "TODO: write the Workshop description.\n\nAdds a Win Rates screen to the Compendium, reporting win rate over your own run history by month, by patch, by run block, and by character.",
+  "description": "Winrate Tracker tracks your winrate over time!  Amazing!\n\nFeatures include:\n- Shows reports based on actual run history per-profile and per-ascension.\n- Calculates total winrate and splits (per-month, per-patch, per-10 game samples, per-50 game samples).\n- Per-character and time period filters.\n- Charts and graphs!  They're not that exciting, really, but they exist.\n- Can optionally exclude floor 1 abandons.\n\nProject source on Github here:  https://github.com/davekalina/spire2-winrate-tracker",
   "visibility": "unlisted",
   "changeNote": "v0.5.3 - updated for game v0.110.",
   "tags": [],

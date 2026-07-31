@@ -20,6 +20,8 @@ workshop/content/
 *.user
 *.suo
 *.csproj.user
+# IDE-generated solution files; each project builds from its own .csproj.
+*.sln
 
 # Local secrets
 .env
