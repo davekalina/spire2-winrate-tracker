@@ -1,7 +1,7 @@
 {
   "title": "Winrate Tracker",
-  "description": "Tracks win rate by character, ascension, and act across your run history.",
-  "visibility": "private",
+  "description": "TODO: write the Workshop description.\n\nAdds a Win Rates screen to the Compendium, reporting win rate over your own run history by month, by patch, by run block, and by character.",
+  "visibility": "unlisted",
   "changeNote": "Initial release.",
   "tags": [],
   "dependencies": [],
