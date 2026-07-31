@@ -2,7 +2,7 @@
   "title": "Winrate Tracker",
   "description": "TODO: write the Workshop description.\n\nAdds a Win Rates screen to the Compendium, reporting win rate over your own run history by month, by patch, by run block, and by character.",
   "visibility": "unlisted",
-  "changeNote": "Initial release.",
+  "changeNote": "v0.5.3 - updated for game v0.110.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []
