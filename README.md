@@ -69,7 +69,7 @@ Building copies `WinrateTracker.json`, `WinrateTracker.dll`, and `WinrateTracker
 Close the game first, or the DLL will be locked.
 
 Runtime diagnostics are in `%APPDATA%\SlayTheSpire2\logs\godot.log`. A successful start
-logs `Winrate Tracker v0.5.0 initialized`.
+logs `Winrate Tracker v0.5.1 initialized`.
 
 ## Publish to the Steam Workshop
 

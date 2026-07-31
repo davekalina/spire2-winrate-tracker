@@ -183,19 +183,19 @@ internal static class NativeStyle
     private const int ButtonFontSize = 22;
 
     /// <summary>
-    /// A square icon button carrying one of the game's own textures. Built on the same
-    /// settings tab as <see cref="TextButton" /> so it hovers and focuses identically,
-    /// with the label left empty and the icon laid over it.
+    /// A bare icon button, the way the game presents its own gear: the top bar's settings
+    /// button is a 64 px icon with no frame behind it. A settings tab makes a poor frame
+    /// here — its texture is 256x90, so squeezed into a square it draws as a thin bar with
+    /// the icon spilling out of it.
     /// </summary>
     public static Control IconButton(string texturePath, float size, Action onPressed)
     {
-        var button = SceneHelper.Instantiate<NSettingsTab>("screens/settings_tab");
-        button.CustomMinimumSize = new Vector2(size, size);
-        button.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        button.Ready += () =>
+        var button = new Control
         {
-            button.SetLabel("");
-            button.Select();
+            CustomMinimumSize = new Vector2(size, size),
+            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            MouseDefaultCursorShape = Control.CursorShape.PointingHand,
         };
 
         var icon = new TextureRect
@@ -204,29 +204,56 @@ internal static class NativeStyle
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
             MouseFilter = Control.MouseFilterEnum.Ignore,
+            PivotOffset = new Vector2(size / 2f, size / 2f),
+            Modulate = IconRestColor,
         };
         icon.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        icon.OffsetLeft = IconInset;
-        icon.OffsetTop = IconInset;
-        icon.OffsetRight = -IconInset;
-        icon.OffsetBottom = -IconInset;
         button.AddChild(icon);
 
+        button.Connect(Control.SignalName.MouseEntered, Callable.From(() =>
+        {
+            icon.Modulate = Colors.White;
+            Nudge(icon, Vector2.One * IconHoverScale);
+        }));
+        button.Connect(Control.SignalName.MouseExited, Callable.From(() =>
+        {
+            icon.Modulate = IconRestColor;
+            Nudge(icon, Vector2.One);
+        }));
         button.Connect(
-            NClickableControl.SignalName.Released,
-            Callable.From<NClickableControl>(_ => onPressed()));
+            Control.SignalName.GuiInput,
+            Callable.From<InputEvent>(input =>
+            {
+                if (input is not InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true })
+                    return;
+                button.AcceptEvent();
+                onPressed();
+            }));
         return button;
     }
 
-    private const float IconInset = 14f;
-
-    /// <summary>The mod's byline, in the dimmed cream used for secondary text.</summary>
-    public static MegaLabel Byline(string text)
+    private static void Nudge(Control icon, Vector2 target)
     {
-        var label = Label(text, NoteFontSize, NoteColor, bold: false);
+        if (icon.IsInsideTree())
+            icon.CreateTween().TweenProperty(icon, "scale", target, 0.05);
+    }
+
+    private const float IconHoverScale = 1.12f;
+
+    private static readonly Color IconRestColor = new(1f, 1f, 1f, 0.78f);
+
+    /// <summary>
+    /// The mod's byline. Two lines and small, the way Hypergeo signs its shelf: the name,
+    /// then the version and author under it.
+    /// </summary>
+    public static MegaLabel Byline(string name, string version, string author)
+    {
+        var label = Label($"{name}\n{version} by {author}", BylineFontSize, HeaderColor, bold: true);
         label.MouseFilter = Control.MouseFilterEnum.Ignore;
         return label;
     }
+
+    private const int BylineFontSize = 17;
 
     /// <summary>How wide a cell's text is in the body font. Drives part alignment.</summary>
     public static float MeasureCell(string text) =>

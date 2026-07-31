@@ -55,9 +55,13 @@ internal sealed class WinrateScreen : IDisposable
     /// <summary>Clearance between the filter row and the top of the scrollbar.</summary>
     private const float ScrollbarGap = 24f;
 
+    /// <summary>Matches the game's own top-bar gear, which is drawn at 64 px.</summary>
     private const float GearSize = 64f;
+
     private const float BylineLeft = 64f;
-    private const float BylineBottom = 48f;
+    private const float BylineBottom = 56f;
+    private const float BylineWidth = 420f;
+    private const float BylineHeight = 52f;
 
     private static readonly string GearIconPath =
         ImageHelper.GetImagePath("atlases/ui_atlas.sprites/top_bar/top_bar_settings.tres");
@@ -158,7 +162,17 @@ internal sealed class WinrateScreen : IDisposable
     {
         if (_screen.GetNodeOrNull<Control>("%StatsGrid/ScrollableContent/Scrollbar") is not { } scrollbar)
             return;
+
         scrollbar.OffsetTop = FilterRowTop + FilterRowHeight + ScrollbarGap;
+
+        // Moving the top alone is not enough. The scene gives the scrollbar a minimum
+        // height of 800 and grows it from its centre, so a shorter rect is expanded back
+        // out in both directions — putting the top straight back under the filter row.
+        // The minimum has to come down with it, and any remaining growth has to go down.
+        scrollbar.CustomMinimumSize = new Vector2(
+            scrollbar.CustomMinimumSize.X,
+            Math.Max(0f, scrollbar.OffsetBottom - scrollbar.OffsetTop));
+        scrollbar.GrowVertical = Control.GrowDirection.End;
     }
 
     /// <summary>
@@ -185,13 +199,15 @@ internal sealed class WinrateScreen : IDisposable
     /// </summary>
     private static Control BuildByline()
     {
-        var label = NativeStyle.Byline($"{MainFile.ModName} {MainFile.Version} by {MainFile.Author}");
-        label.SetAnchorsPreset(Control.LayoutPreset.BottomLeft);
+        var label = NativeStyle.Byline(MainFile.ModName, MainFile.Version, MainFile.Author);
+        label.AnchorLeft = 0f;
+        label.AnchorRight = 0f;
         label.AnchorTop = 1f;
         label.AnchorBottom = 1f;
         label.OffsetLeft = BylineLeft;
+        label.OffsetRight = BylineLeft + BylineWidth;
         label.OffsetTop = -BylineBottom;
-        label.OffsetBottom = -BylineBottom + 28f;
+        label.OffsetBottom = -BylineBottom + BylineHeight;
         label.GrowVertical = Control.GrowDirection.Begin;
         return label;
     }
