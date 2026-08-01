@@ -20,6 +20,10 @@ namespace WinrateTracker.WinrateTrackerCode;
 /// so instantiating it yields a plain <see cref="Control" /> and there is no
 /// <c>NPaginator</c> to talk to.
 ///
+/// Each arrow is its own focus stop, so a gamepad selects an arrow and presses it the same
+/// way a mouse clicks it. The widget as a whole is not focusable — focusing the pair rather
+/// than a button would leave nothing for Select to press.
+///
 /// Its two arrows cannot be reused as they are either: the arrow script's <c>_Ready</c> opens
 /// with <c>GetParent&lt;NPaginator&gt;()</c>, which is a hard cast, so under any other
 /// parent it throws before reaching the three lines that bind its own image and shader.
@@ -72,59 +76,22 @@ internal sealed class FilterBar
         _window = AddControl(row, "Time window");
 
         Root = row;
-        LinkFocus();
         Rebuild();
     }
 
     public Control Root { get; }
 
-    /// <summary>
-    /// Left and right step between the filters; up and down are pinned to self so the
-    /// d-pad cannot wander out of the row into the scrolling tables.
-    /// </summary>
-    private void LinkFocus()
-    {
-        for (var i = 0; i < Controls.Count; i++)
-        {
-            var control = Controls[i];
-            control.FocusNeighborLeft = (i > 0 ? Controls[i - 1] : Controls[i]).GetPath();
-            control.FocusNeighborRight = (i < Controls.Count - 1 ? Controls[i + 1] : Controls[i]).GetPath();
-            control.FocusNeighborTop = control.GetPath();
-            control.FocusNeighborBottom = control.GetPath();
-            control.FocusNext = control.GetPath();
-            control.FocusPrevious = control.GetPath();
-        }
-    }
-
-    /// <summary>Put focus on a filter, so the bumpers have something to page.</summary>
+    /// <summary>Put the cursor on the first arrow.</summary>
     public void FocusFirst() => Controls.FirstOrDefault()?.TryGrabFocus();
 
     /// <summary>
-    /// The three paginators, left to right. The screen wires focus neighbours through
-    /// them so a gamepad can reach the filters and leave again.
+    /// Every arrow in the row, left to right: the three widgets' six buttons. The screen
+    /// chains focus through these — they are the row's only focus stops.
     /// </summary>
     public List<Control> Controls { get; } = [];
 
     /// <summary>Raised after the player pages any control. The screen rebuilds its report.</summary>
     public event Action? Changed;
-
-    /// <summary>
-    /// Page whichever filter currently has focus, for the bumpers. Falls back to the first
-    /// filter so a bumper press does something sensible before anything has been focused.
-    /// </summary>
-    public void StepFocused(int step)
-    {
-        var focused = Root.GetViewport()?.GuiGetFocusOwner();
-        var index = Controls.FindIndex(control => control == focused);
-        if (index < 0)
-        {
-            index = 0;
-            Controls.ElementAtOrDefault(0)?.TryGrabFocus();
-        }
-        _cyclers.ElementAtOrDefault(index)?.Step(step);
-    }
-
-    private readonly List<Cycler> _cyclers = [];
 
     /// <summary>
     /// Rebuild the option lists from the archive and re-select what the session was
@@ -175,18 +142,18 @@ internal sealed class FilterBar
         // container has to be told how much room the arrows and label actually need.
         paginator.CustomMinimumSize = PaginatorSize;
         paginator.SizeFlagsHorizontal = Control.SizeFlags.Fill;
-        // The scene already sets focus_mode = All; restated because everything about this
-        // control being reachable on a gamepad depends on it.
-        paginator.FocusMode = Control.FocusModeEnum.All;
+        // The scene sets focus_mode = All on the widget. The arrows are the buttons here,
+        // so they take the focus and the widget itself must give it up — otherwise the
+        // cursor lands on the pair and Select has nothing to press.
+        paginator.FocusMode = Control.FocusModeEnum.None;
         column.AddChild(paginator);
         row.AddChild(column);
-        Controls.Add(paginator);
 
         var cycler = new Cycler(paginator);
+        Controls.AddRange(cycler.Arrows);
         // Publish first: the screen's handler reads the filter this writes.
         cycler.Changed += Publish;
         cycler.Changed += () => Changed?.Invoke();
-        _cyclers.Add(cycler);
         return cycler;
     }
 
@@ -212,6 +179,9 @@ internal sealed class FilterBar
 
         private const double HoverDuration = 0.05;
 
+        /// <summary>The scene's own highlight, instanced once per arrow.</summary>
+        private const string ReticleScene = "ui/selection_reticle";
+
         private readonly MegaLabel _label;
         private readonly List<Option> _options = [];
         private int _index;
@@ -219,6 +189,11 @@ internal sealed class FilterBar
         public Cycler(Control paginator)
         {
             _label = paginator.GetNode<MegaLabel>("%Label");
+            // The scene's reticle is anchored to the whole widget, so lighting it would
+            // bracket the label and both arrows at once — which says nothing about which
+            // button the cursor is on. Each arrow gets its own instead.
+            if (paginator.GetNodeOrNull<Control>("SelectionReticle") is { } shared)
+                shared.Visible = false;
             // The scene's second label exists only to animate the outgoing value during
             // NPaginator's page tween. Nothing here runs that tween, so it would sit on
             // screen showing the scene's placeholder text.
@@ -226,28 +201,13 @@ internal sealed class FilterBar
 
             ReplaceArrow(paginator, "LeftArrow", -1);
             ReplaceArrow(paginator, "RightArrow", +1);
-            WireControllerInput(paginator);
-        }
 
-        /// <summary>
-        /// Focus drives the scene's selection reticle, which is otherwise dormant here
-        /// because nothing runs it without <c>NPaginator</c>.
-        ///
-        /// Paging is deliberately <em>not</em> wired to left and right: on this screen the
-        /// d-pad moves between the three filters, and the bumpers change the focused one's
-        /// value. See <see cref="FilterBar.StepFocused" />.
-        /// </summary>
-        private void WireControllerInput(Control paginator)
-        {
-            var reticle = paginator.GetNodeOrNull<NSelectionReticle>("SelectionReticle");
-
-            paginator.Connect(Control.SignalName.FocusEntered, Callable.From(() => reticle?.OnSelect()));
-            paginator.Connect(Control.SignalName.FocusExited, Callable.From(() => reticle?.OnDeselect()));
-
-            // A click anywhere on the widget takes focus, so mouse and gamepad agree on
-            // which filter is live.
+            // Clicks land on the arrows, not on the widget behind them.
             paginator.MouseFilter = Control.MouseFilterEnum.Pass;
         }
+
+        /// <summary>Both arrows, left then right. These are the widget's focus stops.</summary>
+        public List<Control> Arrows { get; } = [];
 
         public event Action? Changed;
 
@@ -291,6 +251,9 @@ internal sealed class FilterBar
                 GrowVertical = scripted.GrowVertical,
                 MouseFilter = Control.MouseFilterEnum.Stop,
                 MouseDefaultCursorShape = Control.CursorShape.PointingHand,
+                // The arrow is the button, so it is what the cursor lands on and what
+                // Select presses.
+                FocusMode = Control.FocusModeEnum.All,
                 // v0.110 moved the arrows into their own scene, where the image is drawn
                 // with use_parent_material — it takes its shader from the arrow, not from
                 // itself. Reparenting the image onto a bare Control would drop that
@@ -307,16 +270,54 @@ internal sealed class FilterBar
             var restingScale = image.Scale;
             arrow.Connect(Control.SignalName.MouseEntered, Callable.From(() => Scale(image, restingScale * HoverScale)));
             arrow.Connect(Control.SignalName.MouseExited, Callable.From(() => Scale(image, restingScale)));
+
+            // The game's own selection bracket, sized to this arrow alone. Anchors and
+            // offsets are both written out: the scene carries offsets for the place it sits
+            // in combat (-129, -179 to 123, -1), and a preset call that sets anchors alone
+            // keeps those and stretches the brackets right across the screen.
+            var reticle = SceneHelper.Instantiate<NSelectionReticle>(ReticleScene);
+            reticle.AnchorLeft = 0f;
+            reticle.AnchorTop = 0f;
+            reticle.AnchorRight = 1f;
+            reticle.AnchorBottom = 1f;
+            reticle.OffsetLeft = 0f;
+            reticle.OffsetTop = 0f;
+            reticle.OffsetRight = 0f;
+            reticle.OffsetBottom = 0f;
+            reticle.GrowHorizontal = Control.GrowDirection.Both;
+            reticle.GrowVertical = Control.GrowDirection.Both;
+            reticle.MouseFilter = Control.MouseFilterEnum.Ignore;
+            arrow.AddChild(reticle);
+
+            arrow.Connect(Control.SignalName.FocusEntered, Callable.From(() =>
+            {
+                // _Ready sets the pivot from a size the reticle does not have yet, so it
+                // would scale out of one corner. By now the row has been laid out.
+                reticle.PivotOffset = reticle.Size * 0.5f;
+                reticle.OnSelect();
+                Scale(image, restingScale * HoverScale);
+            }));
+            arrow.Connect(Control.SignalName.FocusExited, Callable.From(() =>
+            {
+                reticle.OnDeselect();
+                Scale(image, restingScale);
+            }));
+
             arrow.Connect(
                 Control.SignalName.GuiInput,
                 Callable.From<InputEvent>(input =>
                 {
-                    if (input is not InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true })
+                    // Mouse press, or Select while focused — the two ways to press a button
+                    // on this screen. NClickableControl does the same for the game's own.
+                    var pressed = input is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true }
+                        || input.IsActionPressed(MegaInput.select);
+                    if (!pressed)
                         return;
                     arrow.AcceptEvent();
-                    Scale(image, restingScale);
                     Step(step);
                 }));
+
+            Arrows.Add(arrow);
         }
 
         /// <summary>Matches the scale nudge the game's arrow plays on hover.</summary>
