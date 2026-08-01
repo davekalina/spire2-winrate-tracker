@@ -87,26 +87,6 @@ internal static class NativeStyle
     private static Font Reload(Font? held, string path) =>
         held is not null && GodotObject.IsInstanceValid(held) ? held : GD.Load<Font>(path);
 
-    /// <summary>
-    /// Make a section heading a focus stop.
-    ///
-    /// The tables themselves hold nothing worth focusing, but the scroll body centres
-    /// itself on whichever of its descendants has focus — so without a stop inside the
-    /// content, a gamepad can reach the filters and then nothing, and the page never
-    /// scrolls. The headings are the natural stops: one per section, already the thing
-    /// you look for when skimming.
-    /// </summary>
-    public static void MakeFocusStop(Control header)
-    {
-        header.FocusMode = Control.FocusModeEnum.All;
-        header.MouseFilter = Control.MouseFilterEnum.Pass;
-        header.Connect(Control.SignalName.FocusEntered, Callable.From(() => header.Modulate = FocusedHeaderTint));
-        header.Connect(Control.SignalName.FocusExited, Callable.From(() => header.Modulate = Colors.White));
-    }
-
-    /// <summary>Brightening rather than recolouring, so the heading stays a heading.</summary>
-    private static readonly Color FocusedHeaderTint = new(1.35f, 1.35f, 1.35f, 1f);
-
     /// <summary>A gold section heading, matching the native "Overall Stats" header exactly.</summary>
     public static MegaLabel Header(string text)
     {

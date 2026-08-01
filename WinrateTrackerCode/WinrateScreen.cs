@@ -88,8 +88,7 @@ internal sealed class WinrateScreen : IDisposable
     private SettingsPopup? _settings;
     private Control? _gear;
 
-    /// <summary>Section headings of the open tab, in order. Focus stops for the gamepad.</summary>
-    private readonly List<Control> _sectionStops = [];
+    private GamepadControls? _gamepad;
 
     private WinrateScreen(NSubmenuStack stack)
     {
@@ -152,7 +151,6 @@ internal sealed class WinrateScreen : IDisposable
                 padlock.Visible = false;
             if (_tabs[i].GetNodeOrNull<CanvasItem>("Label") is { } label)
                 label.Modulate = Colors.White;
-            _tabs[i].FocusMode = Control.FocusModeEnum.All;
             _tabs[i].Connect(
                 NClickableControl.SignalName.Released,
                 Callable.From<NClickableControl>(_ => Show(tab)));
@@ -165,6 +163,7 @@ internal sealed class WinrateScreen : IDisposable
         _screen.AddChild(BuildByline());
         // Added last so the filter row sits above the scroll body in draw order.
         _screen.AddChild(BuildFilterRow());
+        WireGamepad();
     }
 
     /// <summary>
@@ -203,67 +202,56 @@ internal sealed class WinrateScreen : IDisposable
     }
 
     /// <summary>
-    /// Chain focus across the screen so a gamepad can reach everything.
+    /// The gamepad scheme. Triggers cycle the tabs, bumpers page the focused filter, the
+    /// d-pad moves between filters, and the right stick scrolls. See
+    /// <see cref="GamepadControls" /> for why the left stick cannot scroll.
     ///
-    /// Left and right run along a row; up and down move between rows. The filters are the
-    /// exception in spirit rather than in wiring: left and right on a focused paginator
-    /// page its value, as they do on the settings screen, so the filters are chained
-    /// vertically and the row is crossed with up and down.
-    ///
-    /// Re-run on every redraw, because the content sections are rebuilt each time.
+    /// The filter row chains its own focus and pins its top and bottom neighbours to
+    /// itself, so the d-pad cannot leave the row for the scrolling tables. The gear joins
+    /// the end of that chain, or it would be the one control a gamepad could never reach.
     /// </summary>
-    private void LinkFocus()
+    private void WireGamepad()
     {
-        var tabs = _tabs.Cast<Control>().ToList();
-        if (_gear is not null && _gear.IsValid())
-            tabs.Add(_gear);
-        var filters = _filters.Controls.Where(control => control.IsValid()).ToList();
-        var sections = _sectionStops.Where(control => control.IsValid()).ToList();
-
-        Chain(tabs, horizontal: true);
-        Chain(filters, horizontal: false);
-        Chain(sections, horizontal: false);
-
-        // Down from anywhere in the tab row enters the filters; up from any filter comes
-        // back to the tab that is currently open, which is where the player left.
-        var openTab = tabs.ElementAtOrDefault((int)WinrateSession.Tab) ?? tabs.FirstOrDefault();
-        if (filters.Count > 0)
+        if (_gear is not null && _gear.IsValid() && _filters.Controls.LastOrDefault() is { } lastFilter)
         {
-            foreach (var tab in tabs)
-                tab.FocusNeighborBottom = filters[0].GetPath();
-            if (openTab is not null)
-                filters[0].FocusNeighborTop = openTab.GetPath();
+            lastFilter.FocusNeighborRight = _gear.GetPath();
+            _gear.FocusNeighborLeft = lastFilter.GetPath();
+            _gear.FocusNeighborRight = _gear.GetPath();
+            _gear.FocusNeighborTop = _gear.GetPath();
+            _gear.FocusNeighborBottom = _gear.GetPath();
         }
 
-        // ...and down from the last filter reaches the first section heading.
-        if (filters.Count > 0 && sections.Count > 0)
-        {
-            filters[^1].FocusNeighborBottom = sections[0].GetPath();
-            sections[0].FocusNeighborTop = filters[^1].GetPath();
-        }
-    }
+        _gamepad = new GamepadControls(
+            _screen,
+            _screen.GetNodeOrNull<NScrollableContainer>("%StatsGrid/ScrollableContent"),
+            tabLeft: () => CycleTab(-1),
+            tabRight: () => CycleTab(1),
+            valueLeft: () => _filters.StepFocused(-1),
+            valueRight: () => _filters.StepFocused(1));
 
-    /// <summary>
-    /// Point each control at its neighbours and stop at the ends, so focus cannot fall out
-    /// of a row into whatever Godot's geometric search happens to find.
-    /// </summary>
-    private static void Chain(IReadOnlyList<Control> controls, bool horizontal)
-    {
-        for (var i = 0; i < controls.Count; i++)
+        // The bindings are only ours while the screen is actually up.
+        _screen.Connect(CanvasItem.SignalName.VisibilityChanged, Callable.From(() =>
         {
-            var previous = (i > 0 ? controls[i - 1] : controls[i]).GetPath();
-            var next = (i < controls.Count - 1 ? controls[i + 1] : controls[i]).GetPath();
-            if (horizontal)
+            if (_screen.Visible)
             {
-                controls[i].FocusNeighborLeft = previous;
-                controls[i].FocusNeighborRight = next;
+                _gamepad?.Bind();
+                _filters.FocusFirst();
             }
             else
             {
-                controls[i].FocusNeighborTop = previous;
-                controls[i].FocusNeighborBottom = next;
+                _gamepad?.Unbind();
             }
-        }
+        }));
+    }
+
+    /// <summary>Step to the next or previous tab, stopping at the ends rather than wrapping.</summary>
+    private void CycleTab(int step)
+    {
+        var next = (int)WinrateSession.Tab + step;
+        if (next < 0 || next >= _tabs.Count || next >= TabCount)
+            return;
+        // Pressed rather than switched directly, so the tab row's own highlight follows.
+        _tabs[next].ForceTabPressed();
     }
 
     private void ShowSettings()
@@ -347,9 +335,9 @@ internal sealed class WinrateScreen : IDisposable
 
         // The borrowed screen hands the focus system NGeneralStatsGrid's first stat entry,
         // which this screen hides — so on a gamepad the player would open onto a focus
-        // ring they cannot see. Put focus on the open tab instead.
-        if (index >= 0 && index < _tabs.Count)
-            _tabs[index].TryGrabFocus();
+        // ring they cannot see. The filter row is where the d-pad lives, so focus starts
+        // there; the tabs answer the triggers and never need focus.
+        _filters.FocusFirst();
     }
 
     /// <summary>
@@ -417,12 +405,10 @@ internal sealed class WinrateScreen : IDisposable
             var runs = WinrateSession.Filter.Apply(RunArchive.Runs);
             var report = WinrateReport.Build(runs);
             _summary.SetTextAutoSize(SummaryText(report));
-            _sectionStops.Clear();
             replacement = NativeTable.BuildTab(
                 ReportTables.Build(WinrateSession.Tab, report),
                 EmptyMessage(),
-                ShowGraph,
-                _sectionStops);
+                ShowGraph);
         }
         catch (Exception exception)
         {
@@ -436,8 +422,6 @@ internal sealed class WinrateScreen : IDisposable
             child.QueueFree();
         }
         _content.AddChild(replacement);
-        // The sections are new nodes every redraw, so the focus chain is rebuilt with them.
-        LinkFocus();
     }
 
     private static string EmptyMessage()
@@ -570,6 +554,8 @@ internal sealed class WinrateScreen : IDisposable
     public void Dispose()
     {
         _filters.Changed -= Rebuild;
+        _gamepad?.Dispose();
+        _gamepad = null;
         if (_screen.IsValid())
         {
             StatsScreenPatch.Forget(_screen);

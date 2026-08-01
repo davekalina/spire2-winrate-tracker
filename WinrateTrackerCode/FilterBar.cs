@@ -72,10 +72,32 @@ internal sealed class FilterBar
         _window = AddControl(row, "Time window");
 
         Root = row;
+        LinkFocus();
         Rebuild();
     }
 
     public Control Root { get; }
+
+    /// <summary>
+    /// Left and right step between the filters; up and down are pinned to self so the
+    /// d-pad cannot wander out of the row into the scrolling tables.
+    /// </summary>
+    private void LinkFocus()
+    {
+        for (var i = 0; i < Controls.Count; i++)
+        {
+            var control = Controls[i];
+            control.FocusNeighborLeft = (i > 0 ? Controls[i - 1] : Controls[i]).GetPath();
+            control.FocusNeighborRight = (i < Controls.Count - 1 ? Controls[i + 1] : Controls[i]).GetPath();
+            control.FocusNeighborTop = control.GetPath();
+            control.FocusNeighborBottom = control.GetPath();
+            control.FocusNext = control.GetPath();
+            control.FocusPrevious = control.GetPath();
+        }
+    }
+
+    /// <summary>Put focus on a filter, so the bumpers have something to page.</summary>
+    public void FocusFirst() => Controls.FirstOrDefault()?.TryGrabFocus();
 
     /// <summary>
     /// The three paginators, left to right. The screen wires focus neighbours through
@@ -85,6 +107,24 @@ internal sealed class FilterBar
 
     /// <summary>Raised after the player pages any control. The screen rebuilds its report.</summary>
     public event Action? Changed;
+
+    /// <summary>
+    /// Page whichever filter currently has focus, for the bumpers. Falls back to the first
+    /// filter so a bumper press does something sensible before anything has been focused.
+    /// </summary>
+    public void StepFocused(int step)
+    {
+        var focused = Root.GetViewport()?.GuiGetFocusOwner();
+        var index = Controls.FindIndex(control => control == focused);
+        if (index < 0)
+        {
+            index = 0;
+            Controls.ElementAtOrDefault(0)?.TryGrabFocus();
+        }
+        _cyclers.ElementAtOrDefault(index)?.Step(step);
+    }
+
+    private readonly List<Cycler> _cyclers = [];
 
     /// <summary>
     /// Rebuild the option lists from the archive and re-select what the session was
@@ -146,6 +186,7 @@ internal sealed class FilterBar
         // Publish first: the screen's handler reads the filter this writes.
         cycler.Changed += Publish;
         cycler.Changed += () => Changed?.Invoke();
+        _cyclers.Add(cycler);
         return cycler;
     }
 
@@ -189,13 +230,12 @@ internal sealed class FilterBar
         }
 
         /// <summary>
-        /// Left and right page the value while this paginator holds focus, which is what
-        /// <c>NPaginator</c> itself does and therefore what a player's hands already know
-        /// from the settings screen. Up and down are left alone, so Godot's focus
-        /// neighbours can carry the player out of the filter row.
+        /// Focus drives the scene's selection reticle, which is otherwise dormant here
+        /// because nothing runs it without <c>NPaginator</c>.
         ///
-        /// The scene ships a selection reticle for exactly this; it is dormant here
-        /// because nothing drives it without <c>NPaginator</c>, so focus does.
+        /// Paging is deliberately <em>not</em> wired to left and right: on this screen the
+        /// d-pad moves between the three filters, and the bumpers change the focused one's
+        /// value. See <see cref="FilterBar.StepFocused" />.
         /// </summary>
         private void WireControllerInput(Control paginator)
         {
@@ -203,18 +243,6 @@ internal sealed class FilterBar
 
             paginator.Connect(Control.SignalName.FocusEntered, Callable.From(() => reticle?.OnSelect()));
             paginator.Connect(Control.SignalName.FocusExited, Callable.From(() => reticle?.OnDeselect()));
-            paginator.Connect(
-                Control.SignalName.GuiInput,
-                Callable.From<InputEvent>(input =>
-                {
-                    var step = input.IsActionPressed(MegaInput.left) ? -1
-                        : input.IsActionPressed(MegaInput.right) ? 1
-                        : 0;
-                    if (step == 0)
-                        return;
-                    paginator.AcceptEvent();
-                    Step(step);
-                }));
 
             // A click anywhere on the widget takes focus, so mouse and gamepad agree on
             // which filter is live.
@@ -299,7 +327,7 @@ internal sealed class FilterBar
             image.CreateTween().TweenProperty(image, "scale", target, HoverDuration);
         }
 
-        private void Step(int step)
+        public void Step(int step)
         {
             if (_options.Count <= 1)
                 return;

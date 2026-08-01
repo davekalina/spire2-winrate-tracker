@@ -16,30 +16,21 @@ internal static class NativeTable
     /// Title (with a Show Graph button where there is something to plot) over the
     /// panelled table.
     /// </summary>
-    public static Control BuildSection(
-        TableSection section,
-        Action<TableSection>? onShowGraph,
-        List<Control>? focusStops = null)
+    public static Control BuildSection(TableSection section, Action<TableSection>? onShowGraph)
     {
         var column = new VBoxContainer();
         column.AddThemeConstantOverride("separation", 4);
 
         if (!string.IsNullOrEmpty(section.Title))
-            column.AddChild(BuildHeaderRow(section, onShowGraph, focusStops));
+            column.AddChild(BuildHeaderRow(section, onShowGraph));
 
         column.AddChild(NativeStyle.Panel(BuildGrid(section)));
         return column;
     }
 
-    private static Control BuildHeaderRow(
-        TableSection section,
-        Action<TableSection>? onShowGraph,
-        List<Control>? focusStops)
+    private static Control BuildHeaderRow(TableSection section, Action<TableSection>? onShowGraph)
     {
         var header = NativeStyle.Header(section.Title);
-        NativeStyle.MakeFocusStop(header);
-        focusStops?.Add(header);
-
         if (onShowGraph is null || !section.IsGraphable)
             return header;
 
@@ -53,9 +44,6 @@ internal static class NativeTable
 
         var graph = NativeStyle.TextButton("Show Graph", () => onShowGraph(section));
         row.AddChild(graph);
-        // Right from the heading reaches its own button, and left comes back.
-        header.FocusNeighborRight = graph.GetPath();
-        graph.FocusNeighborLeft = header.GetPath();
         return row;
     }
 
@@ -143,15 +131,10 @@ internal static class NativeTable
     }
 
     /// <summary>All of a tab's sections, separated the way the native screen separates blocks.</summary>
-    /// <param name="focusStops">
-    /// Collects the section headings, in order, so the screen can chain them vertically
-    /// for gamepad navigation.
-    /// </param>
     public static Control BuildTab(
         IReadOnlyList<TableSection> sections,
         string emptyMessage,
-        Action<TableSection>? onShowGraph = null,
-        List<Control>? focusStops = null)
+        Action<TableSection>? onShowGraph = null)
     {
         var column = new VBoxContainer();
         column.AddThemeConstantOverride("separation", NativeStyle.SectionSeparation);
@@ -163,7 +146,7 @@ internal static class NativeTable
         }
 
         foreach (var section in sections)
-            column.AddChild(BuildSection(section, onShowGraph, focusStops));
+            column.AddChild(BuildSection(section, onShowGraph));
 
         return column;
     }
