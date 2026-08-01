@@ -1,4 +1,7 @@
 using Godot;
+using MegaCrit.Sts2.Core.ControllerInput;
+using MegaCrit.Sts2.Core.Nodes.CommonUi;
+using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
 using MegaCrit.Sts2.Core.Helpers;
 
 namespace WinrateTracker.WinrateTrackerCode;
@@ -37,6 +40,7 @@ internal sealed class ModalPanel
             MouseFilter = Control.MouseFilterEnum.Stop,
         };
         backdrop.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        var previousFocus = host.GetViewport()?.GuiGetFocusOwner();
         host.AddChild(backdrop);
 
         var panel = new Control
@@ -72,9 +76,10 @@ internal sealed class ModalPanel
         panel.AddChild(content);
 
         backdrop.AddChild(panel);
-        var modal = new ModalPanel(backdrop, panel, content);
+        var modal = new ModalPanel(backdrop, panel, content) { _returnFocusTo = previousFocus };
 
         var close = NativeStyle.TextButton("Close", modal.Close);
+        modal._close = close;
         close.Position = new Vector2(width - ContentInsetRight - CloseButtonWidth, 22f);
         panel.AddChild(close);
 
@@ -86,8 +91,25 @@ internal sealed class ModalPanel
                     modal.Close();
             }));
 
+        // B / Escape has to close the modal rather than the screen underneath it. The back
+        // button binds the same hotkeys, so this is pushed onto the manager's stack while
+        // the modal is up and removed the moment it closes — which is exactly how the
+        // game's own patch notes screen sits over the main menu.
+        modal._cancel = modal.Close;
+        foreach (var hotkey in CancelHotkeys)
+            NHotkeyManager.Instance?.PushHotkeyReleasedBinding(hotkey, modal._cancel);
+
+        // Focus lands on Close so a gamepad has somewhere to be, and so the modal owns
+        // navigation instead of leaving it on whatever was focused behind it.
+        close.TryGrabFocus();
         return modal;
     }
+
+    /// <summary>What the back button listens for, and therefore what a modal must take over.</summary>
+    private static readonly string[] CancelHotkeys =
+        [MegaInput.cancel, MegaInput.pauseAndBack, MegaInput.back];
+
+    private Action? _cancel;
 
     public const float ContentInsetLeft = 128f;
     public const float ContentInsetRight = 128f;
@@ -98,9 +120,38 @@ internal sealed class ModalPanel
 
     public bool IsOpen => GodotObject.IsInstanceValid(_backdrop);
 
+    /// <summary>
+    /// Chain a control under the Close button, which is where the modal puts focus when it
+    /// opens. Without this a gamepad can see the modal's contents but only reach Close.
+    /// </summary>
+    public void LinkFocusBelowClose(Control control)
+    {
+        if (_close is null || !_close.IsValid() || !control.IsValid())
+            return;
+        _close.FocusNeighborBottom = control.GetPath();
+        control.FocusNeighborTop = _close.GetPath();
+        control.FocusNeighborBottom = control.GetPath();
+    }
+
+    private Control? _close;
+
     public void Close()
     {
-        if (GodotObject.IsInstanceValid(_backdrop))
-            _backdrop.QueueFree();
+        if (_cancel is not null)
+        {
+            foreach (var hotkey in CancelHotkeys)
+                NHotkeyManager.Instance?.RemoveHotkeyReleasedBinding(hotkey, _cancel);
+            _cancel = null;
+        }
+
+        if (!GodotObject.IsInstanceValid(_backdrop))
+            return;
+        // Hand focus back to whatever opened the modal, or the gamepad is left with
+        // nothing selected on the screen underneath.
+        _returnFocusTo?.TryGrabFocus();
+        _backdrop.QueueFree();
     }
+
+    /// <summary>Where focus goes when the modal closes: whatever had it when it opened.</summary>
+    private Control? _returnFocusTo;
 }

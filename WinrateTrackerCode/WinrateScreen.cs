@@ -86,6 +86,10 @@ internal sealed class WinrateScreen : IDisposable
     private MegaLabel _summary = null!;
     private GraphPopup? _graph;
     private SettingsPopup? _settings;
+    private Control? _gear;
+
+    /// <summary>Section headings of the open tab, in order. Focus stops for the gamepad.</summary>
+    private readonly List<Control> _sectionStops = [];
 
     private WinrateScreen(NSubmenuStack stack)
     {
@@ -148,6 +152,7 @@ internal sealed class WinrateScreen : IDisposable
                 padlock.Visible = false;
             if (_tabs[i].GetNodeOrNull<CanvasItem>("Label") is { } label)
                 label.Modulate = Colors.White;
+            _tabs[i].FocusMode = Control.FocusModeEnum.All;
             _tabs[i].Connect(
                 NClickableControl.SignalName.Released,
                 Callable.From<NClickableControl>(_ => Show(tab)));
@@ -193,7 +198,72 @@ internal sealed class WinrateScreen : IDisposable
     {
         if (tabContainer.GetParent() is not Control tabRow)
             return;
-        tabRow.AddChild(NativeStyle.IconButton(GearIconPath, GearSize, ShowSettings));
+        _gear = NativeStyle.IconButton(GearIconPath, GearSize, ShowSettings);
+        tabRow.AddChild(_gear);
+    }
+
+    /// <summary>
+    /// Chain focus across the screen so a gamepad can reach everything.
+    ///
+    /// Left and right run along a row; up and down move between rows. The filters are the
+    /// exception in spirit rather than in wiring: left and right on a focused paginator
+    /// page its value, as they do on the settings screen, so the filters are chained
+    /// vertically and the row is crossed with up and down.
+    ///
+    /// Re-run on every redraw, because the content sections are rebuilt each time.
+    /// </summary>
+    private void LinkFocus()
+    {
+        var tabs = _tabs.Cast<Control>().ToList();
+        if (_gear is not null && _gear.IsValid())
+            tabs.Add(_gear);
+        var filters = _filters.Controls.Where(control => control.IsValid()).ToList();
+        var sections = _sectionStops.Where(control => control.IsValid()).ToList();
+
+        Chain(tabs, horizontal: true);
+        Chain(filters, horizontal: false);
+        Chain(sections, horizontal: false);
+
+        // Down from anywhere in the tab row enters the filters; up from any filter comes
+        // back to the tab that is currently open, which is where the player left.
+        var openTab = tabs.ElementAtOrDefault((int)WinrateSession.Tab) ?? tabs.FirstOrDefault();
+        if (filters.Count > 0)
+        {
+            foreach (var tab in tabs)
+                tab.FocusNeighborBottom = filters[0].GetPath();
+            if (openTab is not null)
+                filters[0].FocusNeighborTop = openTab.GetPath();
+        }
+
+        // ...and down from the last filter reaches the first section heading.
+        if (filters.Count > 0 && sections.Count > 0)
+        {
+            filters[^1].FocusNeighborBottom = sections[0].GetPath();
+            sections[0].FocusNeighborTop = filters[^1].GetPath();
+        }
+    }
+
+    /// <summary>
+    /// Point each control at its neighbours and stop at the ends, so focus cannot fall out
+    /// of a row into whatever Godot's geometric search happens to find.
+    /// </summary>
+    private static void Chain(IReadOnlyList<Control> controls, bool horizontal)
+    {
+        for (var i = 0; i < controls.Count; i++)
+        {
+            var previous = (i > 0 ? controls[i - 1] : controls[i]).GetPath();
+            var next = (i < controls.Count - 1 ? controls[i + 1] : controls[i]).GetPath();
+            if (horizontal)
+            {
+                controls[i].FocusNeighborLeft = previous;
+                controls[i].FocusNeighborRight = next;
+            }
+            else
+            {
+                controls[i].FocusNeighborTop = previous;
+                controls[i].FocusNeighborBottom = next;
+            }
+        }
     }
 
     private void ShowSettings()
@@ -274,6 +344,12 @@ internal sealed class WinrateScreen : IDisposable
             _tabs[index].ForceTabPressed();
         else
             Show(ReportTab.Overview);
+
+        // The borrowed screen hands the focus system NGeneralStatsGrid's first stat entry,
+        // which this screen hides — so on a gamepad the player would open onto a focus
+        // ring they cannot see. Put focus on the open tab instead.
+        if (index >= 0 && index < _tabs.Count)
+            _tabs[index].TryGrabFocus();
     }
 
     /// <summary>
@@ -341,10 +417,12 @@ internal sealed class WinrateScreen : IDisposable
             var runs = WinrateSession.Filter.Apply(RunArchive.Runs);
             var report = WinrateReport.Build(runs);
             _summary.SetTextAutoSize(SummaryText(report));
+            _sectionStops.Clear();
             replacement = NativeTable.BuildTab(
                 ReportTables.Build(WinrateSession.Tab, report),
                 EmptyMessage(),
-                ShowGraph);
+                ShowGraph,
+                _sectionStops);
         }
         catch (Exception exception)
         {
@@ -358,6 +436,8 @@ internal sealed class WinrateScreen : IDisposable
             child.QueueFree();
         }
         _content.AddChild(replacement);
+        // The sections are new nodes every redraw, so the focus chain is rebuilt with them.
+        LinkFocus();
     }
 
     private static string EmptyMessage()

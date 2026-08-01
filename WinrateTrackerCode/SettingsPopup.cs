@@ -34,8 +34,7 @@ internal sealed class SettingsPopup
 
         var ignoreEarly = SceneHelper.Instantiate<NLibraryStatTickbox>(TickboxScene);
         ignoreEarly.CustomMinimumSize = new Vector2(0, RowHeight);
-        ignoreEarly.FocusNeighborTop = new NodePath();
-        ignoreEarly.FocusNeighborBottom = new NodePath();
+        ignoreEarly.FocusMode = Control.FocusModeEnum.All;
         ignoreEarly.Ready += () =>
         {
             ignoreEarly.SetLabel("Ignore floor-1 abandons");
@@ -47,6 +46,10 @@ internal sealed class SettingsPopup
         rows.AddChild(NativeStyle.Note(
             "An abandoned run counts as a loss. A run abandoned on the first floor is a "
             + "reroll rather than a run, and is left out entirely."));
+
+        // The modal opens with Close focused; down reaches the setting and up returns, so
+        // a gamepad can get at every control in here.
+        modal.LinkFocusBelowClose(ignoreEarly);
 
         return new SettingsPopup(modal);
     }

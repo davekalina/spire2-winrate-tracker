@@ -18,7 +18,7 @@ public partial class MainFile : Node
     public const string ModName = "Winrate Tracker";
 
     /// <summary>Keep in step with the manifest version.</summary>
-    public const string Version = "v0.5.3";
+    public const string Version = "v0.6.0";
 
     public const string Author = "realtruegravy";
 

@@ -1,5 +1,7 @@
 using Godot;
+using MegaCrit.Sts2.Core.ControllerInput;
 using MegaCrit.Sts2.Core.Helpers;
+using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
 using MegaCrit.Sts2.addons.mega_text;
 
@@ -75,6 +77,12 @@ internal sealed class FilterBar
 
     public Control Root { get; }
 
+    /// <summary>
+    /// The three paginators, left to right. The screen wires focus neighbours through
+    /// them so a gamepad can reach the filters and leave again.
+    /// </summary>
+    public List<Control> Controls { get; } = [];
+
     /// <summary>Raised after the player pages any control. The screen rebuilds its report.</summary>
     public event Action? Changed;
 
@@ -127,8 +135,12 @@ internal sealed class FilterBar
         // container has to be told how much room the arrows and label actually need.
         paginator.CustomMinimumSize = PaginatorSize;
         paginator.SizeFlagsHorizontal = Control.SizeFlags.Fill;
+        // The scene already sets focus_mode = All; restated because everything about this
+        // control being reachable on a gamepad depends on it.
+        paginator.FocusMode = Control.FocusModeEnum.All;
         column.AddChild(paginator);
         row.AddChild(column);
+        Controls.Add(paginator);
 
         var cycler = new Cycler(paginator);
         // Publish first: the screen's handler reads the filter this writes.
@@ -173,6 +185,40 @@ internal sealed class FilterBar
 
             ReplaceArrow(paginator, "LeftArrow", -1);
             ReplaceArrow(paginator, "RightArrow", +1);
+            WireControllerInput(paginator);
+        }
+
+        /// <summary>
+        /// Left and right page the value while this paginator holds focus, which is what
+        /// <c>NPaginator</c> itself does and therefore what a player's hands already know
+        /// from the settings screen. Up and down are left alone, so Godot's focus
+        /// neighbours can carry the player out of the filter row.
+        ///
+        /// The scene ships a selection reticle for exactly this; it is dormant here
+        /// because nothing drives it without <c>NPaginator</c>, so focus does.
+        /// </summary>
+        private void WireControllerInput(Control paginator)
+        {
+            var reticle = paginator.GetNodeOrNull<NSelectionReticle>("SelectionReticle");
+
+            paginator.Connect(Control.SignalName.FocusEntered, Callable.From(() => reticle?.OnSelect()));
+            paginator.Connect(Control.SignalName.FocusExited, Callable.From(() => reticle?.OnDeselect()));
+            paginator.Connect(
+                Control.SignalName.GuiInput,
+                Callable.From<InputEvent>(input =>
+                {
+                    var step = input.IsActionPressed(MegaInput.left) ? -1
+                        : input.IsActionPressed(MegaInput.right) ? 1
+                        : 0;
+                    if (step == 0)
+                        return;
+                    paginator.AcceptEvent();
+                    Step(step);
+                }));
+
+            // A click anywhere on the widget takes focus, so mouse and gamepad agree on
+            // which filter is live.
+            paginator.MouseFilter = Control.MouseFilterEnum.Pass;
         }
 
         public event Action? Changed;

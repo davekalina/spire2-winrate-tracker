@@ -1,4 +1,5 @@
 using Godot;
+using MegaCrit.Sts2.Core.ControllerInput;
 using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
 using MegaCrit.Sts2.Core.Nodes.Screens.Settings;
@@ -86,6 +87,26 @@ internal static class NativeStyle
     private static Font Reload(Font? held, string path) =>
         held is not null && GodotObject.IsInstanceValid(held) ? held : GD.Load<Font>(path);
 
+    /// <summary>
+    /// Make a section heading a focus stop.
+    ///
+    /// The tables themselves hold nothing worth focusing, but the scroll body centres
+    /// itself on whichever of its descendants has focus — so without a stop inside the
+    /// content, a gamepad can reach the filters and then nothing, and the page never
+    /// scrolls. The headings are the natural stops: one per section, already the thing
+    /// you look for when skimming.
+    /// </summary>
+    public static void MakeFocusStop(Control header)
+    {
+        header.FocusMode = Control.FocusModeEnum.All;
+        header.MouseFilter = Control.MouseFilterEnum.Pass;
+        header.Connect(Control.SignalName.FocusEntered, Callable.From(() => header.Modulate = FocusedHeaderTint));
+        header.Connect(Control.SignalName.FocusExited, Callable.From(() => header.Modulate = Colors.White));
+    }
+
+    /// <summary>Brightening rather than recolouring, so the heading stays a heading.</summary>
+    private static readonly Color FocusedHeaderTint = new(1.35f, 1.35f, 1.35f, 1f);
+
     /// <summary>A gold section heading, matching the native "Overall Stats" header exactly.</summary>
     public static MegaLabel Header(string text)
     {
@@ -159,6 +180,9 @@ internal static class NativeStyle
         var button = SceneHelper.Instantiate<NSettingsTab>("screens/settings_tab");
         button.CustomMinimumSize = ButtonSize;
         button.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        // NClickableControl only treats a control as controller-navigable when its focus
+        // mode is All, and the scene does not set one.
+        button.FocusMode = Control.FocusModeEnum.All;
         button.Ready += () =>
         {
             if (button.GetNodeOrNull<MegaLabel>("Label") is { } label)
@@ -196,6 +220,7 @@ internal static class NativeStyle
             SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
             MouseFilter = Control.MouseFilterEnum.Stop,
             MouseDefaultCursorShape = Control.CursorShape.PointingHand,
+            FocusMode = Control.FocusModeEnum.All,
         };
 
         var icon = new TextureRect
@@ -210,21 +235,24 @@ internal static class NativeStyle
         icon.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         button.AddChild(icon);
 
-        button.Connect(Control.SignalName.MouseEntered, Callable.From(() =>
-        {
-            icon.Modulate = Colors.White;
-            Nudge(icon, Vector2.One * IconHoverScale);
-        }));
-        button.Connect(Control.SignalName.MouseExited, Callable.From(() =>
-        {
-            icon.Modulate = IconRestColor;
-            Nudge(icon, Vector2.One);
-        }));
+        void Highlight() { icon.Modulate = Colors.White; Nudge(icon, Vector2.One * IconHoverScale); }
+        void Rest() { icon.Modulate = IconRestColor; Nudge(icon, Vector2.One); }
+
+        button.Connect(Control.SignalName.MouseEntered, Callable.From(Highlight));
+        button.Connect(Control.SignalName.MouseExited, Callable.From(Rest));
+        // The same emphasis for controller focus as for the mouse, or the gamepad has no
+        // way to tell the gear is the thing it is pointing at.
+        button.Connect(Control.SignalName.FocusEntered, Callable.From(Highlight));
+        button.Connect(Control.SignalName.FocusExited, Callable.From(Rest));
+
         button.Connect(
             Control.SignalName.GuiInput,
             Callable.From<InputEvent>(input =>
             {
-                if (input is not InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true })
+                var pressed = input is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true }
+                    || input.IsActionPressed(MegaInput.confirm)
+                    || input.IsActionPressed(MegaInput.select);
+                if (!pressed)
                     return;
                 button.AcceptEvent();
                 onPressed();
