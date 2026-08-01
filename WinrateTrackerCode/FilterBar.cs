@@ -20,7 +20,7 @@ namespace WinrateTracker.WinrateTrackerCode;
 /// so instantiating it yields a plain <see cref="Control" /> and there is no
 /// <c>NPaginator</c> to talk to.
 ///
-/// Its two arrows cannot be reused as they are either: <c>NPaginateArrow._Ready</c> opens
+/// Its two arrows cannot be reused as they are either: the arrow script's <c>_Ready</c> opens
 /// with <c>GetParent&lt;NPaginator&gt;()</c>, which is a hard cast, so under any other
 /// parent it throws before reaching the three lines that bind its own image and shader.
 /// The arrow is then half-built and dead. So each arrow's artwork is moved onto a control
@@ -166,7 +166,7 @@ internal sealed class FilterBar
     /// </summary>
     private sealed class Cycler
     {
-        /// <summary>Hover nudge, taken from <c>NPaginateArrow.OnFocus</c>.</summary>
+        /// <summary>Hover nudge, taken from the game's own paginator arrow.</summary>
         private const float HoverScale = 1.1f;
 
         private const double HoverDuration = 0.05;
@@ -236,7 +236,7 @@ internal sealed class FilterBar
         }
 
         /// <summary>
-        /// Swap one <c>NPaginateArrow</c> for a plain control wearing its artwork, and
+        /// Swap one scripted arrow for a plain control wearing its artwork, and
         /// make that clickable. Called before the paginator is in the tree, so the
         /// scripted node is freed without its <c>_Ready</c> ever running.
         /// </summary>
@@ -291,7 +291,7 @@ internal sealed class FilterBar
                 }));
         }
 
-        /// <summary>Matches the scale nudge <c>NPaginateArrow</c> plays on hover.</summary>
+        /// <summary>Matches the scale nudge the game's arrow plays on hover.</summary>
         private static void Scale(Control image, Vector2 target)
         {
             if (!image.IsInsideTree())

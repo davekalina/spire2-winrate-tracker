@@ -14,8 +14,8 @@ namespace WinrateTracker.WinrateTrackerCode;
 /// It is a second, private instance of the game's own Statistics screen with its contents
 /// replaced. That screen is already the exact shape this one needs — a tabbed, scrollable
 /// panel of numbers with a back button — and reusing it means the back button, the
-/// Escape and controller dismissal, the focus handling, the scroll gradient, the
-/// scrollbar, and the L/R trigger tab cycling are all the game's own, not imitations.
+/// Escape and controller dismissal, the scroll gradient, and the scroll-follows-focus
+/// behaviour are all the game's own, not imitations.
 /// It also has to be a real <c>NSubmenu</c> to go on the submenu stack at all, and a mod
 /// assembly cannot declare one: a subclass of a Godot script type needs a registered
 /// script, which only the game's own scenes have.
@@ -110,8 +110,8 @@ internal sealed class WinrateScreen : IDisposable
 
     private void Build(NSubmenuStack stack)
     {
-        // Before the tree, so NStatsTabManager._Ready counts four tabs and wires trigger
-        // cycling across all of them.
+        // Before the tree, so NStatsTabManager._Ready counts every tab: it snapshots the
+        // container's children once and never looks again.
         var tabContainer = _screen.GetNode<Control>("%Tabs").GetNode<Control>("TabContainer");
         for (var i = tabContainer.GetChildCount(); i < TabCount; i++)
             tabContainer.AddChild(SceneHelper.Instantiate<NSettingsTab>(TabScene));

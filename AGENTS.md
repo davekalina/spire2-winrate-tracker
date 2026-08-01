@@ -34,13 +34,13 @@ row (ascension, character, time window). One setting lives in Settings → Mod S
 - **The files are parsed by hand, not through `SaveManager.LoadRunHistory`.** That path
   runs save migrations and deserializes the whole run — deck, relics, every per-floor
   stat block — to answer a question that needs a dozen scalars. `RunParser` reads the raw
-  JSON instead. The archive already spans schema v8 and v9 and the fields it reads have
+  JSON instead. The archive already spans schema v8 through v10 and the fields it reads have
   been stable across both.
 - **The screen is a second instance of the native Statistics screen**, contents replaced.
   It has to be a real `NSubmenu` to go on the submenu stack, and a mod assembly cannot
   declare one — a subclass of a Godot script type needs a registered script, which only
   the game's own scenes have. Borrowing the scene also inherits its back button, Escape
-  and controller dismissal, scroll gradient, scrollbar, and trigger tab cycling.
+  and controller dismissal, scroll gradient, scrollbar, and scroll-follows-focus.
 - **Anything game-independent lives in its own file** and is linked into
   `WinrateTracker.Tests`: `RunRecord`, `RunParser`, `RunFilter`, `WinrateReport`,
   `Format`, `ReportTables`. `ReportTables` decides the exact text of every cell, so the
@@ -92,7 +92,7 @@ and only showed up as a screen that silently did nothing. Check all three offlin
 2. **Scene casts** — a scene's *root* must carry the script you are casting to.
    `screens/paginator` does not, and `SceneHelper.Instantiate<NPaginator>` on it throws.
    Check the scripted *children* too: `Node.GetParent<T>()` is a hard cast, and
-   `NPaginateArrow._Ready` uses it.
+   the paginator's arrow script does exactly that on its parent.
 3. **The log** — `%APPDATA%\SlayTheSpire2\logs\godot.log`. Godot catches exceptions thrown
    inside signal handlers and `_Ready`, logs them, and carries on, so a broken screen
    reports nothing on screen and everything in there.

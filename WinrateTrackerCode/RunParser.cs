@@ -11,7 +11,7 @@ namespace WinrateTracker.WinrateTrackerCode;
 /// <c>SaveManager.LoadRunHistory</c>. That path runs the save migration pipeline and
 /// deserializes the whole run — deck, relics, and every per-floor stat block — which is
 /// both far more work than a win rate needs and a source of failure on old files: the
-/// archive here spans schema v8 and v9, and older files still on disk migrate on every
+/// archive here spans schema v8 through v10, and older files still on disk migrate on every
 /// read. The fields below (result, ascension, character, room types) have been stable
 /// across those versions, so reading them directly is faster *and* survives more files.
 ///
