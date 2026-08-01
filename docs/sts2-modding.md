@@ -39,7 +39,7 @@ attribute. From there, three layers are available, in order of preference:
 | `author` | |
 | `description` | |
 | `version` | Free-form string; the loader compares it when reconciling Steam vs local copies. |
-| `min_game_version` | |
+| `min_game_version` | **Enforced.** Compared as a semantic version against the game's own; a mod declaring a higher one is refused with `MOD_ERROR.GAME_VERSION_UNSUPPORTED` and never initialises. A value that cannot be parsed fails the mod too. Omitting it logs a warning and assumes support. |
 | `has_dll` / `has_pck` | Booleans. The loader only looks for the file when the flag is true. |
 | `dependencies` | `[{"id": "...", "min_version": "..."}]`. The bare-string form is deprecated and logs an error. |
 | `affects_gameplay` | Defaults to **`true`** if omitted. Informational overlays must set it to `false`; it also matters for multiplayer compatibility. |
