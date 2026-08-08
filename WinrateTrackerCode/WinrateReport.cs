@@ -46,6 +46,19 @@ internal sealed record CharacterRow(string Character, Tally All, Tally Last10, T
 internal sealed record CountRow(string Label, int Count);
 
 /// <summary>
+/// One named bucket of runs that is not a stretch of time — a part of the day, say. No
+/// from/to and no running total, because the rows are not consecutive.
+/// </summary>
+internal sealed record GroupRow(string Label, Tally Tally);
+
+/// <summary>
+/// One card or relic and how the runs that picked it went. Carries the raw id rather than
+/// a name: the game's text tables are what turn <c>SHIV</c> into "Shiv", and they live on
+/// the other side of the line that keeps this file testable without the game.
+/// </summary>
+internal sealed record PickRow(string Id, Tally Tally);
+
+/// <summary>
 /// A labelled row of the month-by-character grid. A null cell is a month that character
 /// did not play — kept as null rather than a zero tally so the table can say so.
 /// </summary>
@@ -117,6 +130,18 @@ internal sealed record WinrateReport
     /// <summary>Losses bucketed by how far the run got, Act 1 first.</summary>
     public required IReadOnlyList<CountRow> LossesByAct { get; init; }
 
+    /// <summary>Runs grouped into morning, afternoon and night. See <see cref="PartOfDay" />.</summary>
+    public required IReadOnlyList<GroupRow> TimeOfDay { get; init; }
+
+    /// <summary>The same runs cut into six four-hour blocks, for a finer look at the same question.</summary>
+    public required IReadOnlyList<GroupRow> HourBlocks { get; init; }
+
+    /// <summary>Every card picked at least once, best win rate first.</summary>
+    public required IReadOnlyList<PickRow> Cards { get; init; }
+
+    /// <summary>Every relic picked at least once, best win rate first.</summary>
+    public required IReadOnlyList<PickRow> Relics { get; init; }
+
     public bool IsEmpty => Runs.Count == 0;
 
     /// <param name="runs">Filtered runs, oldest first — see <see cref="RunFilter.Apply" />.</param>
@@ -145,6 +170,10 @@ internal sealed record WinrateReport
             MonthByCharacter = MonthByCharacterOf(runs, matrixCharacters),
             TopDeaths = TopDeathsOf(losses),
             LossesByAct = LossesByActOf(losses),
+            TimeOfDay = TimeOfDayOf(runs),
+            HourBlocks = HourBlocksOf(runs),
+            Cards = PicksOf(runs, run => run.PickedCards),
+            Relics = PicksOf(runs, run => run.PickedRelics),
         };
     }
 
@@ -331,5 +360,80 @@ internal sealed record WinrateReport
         for (var i = start; i < start + length; i++)
             slice.Add(runs[i]);
         return slice;
+    }
+
+    /// <summary>
+    /// Which part of the day an hour belongs to. The boundaries are the ordinary ones —
+    /// morning runs to noon, afternoon to six — with everything from six in the evening
+    /// until six in the morning counted as night, so a run started after midnight lands
+    /// with the late-night runs rather than opening a new morning.
+    /// </summary>
+    private static string PartOfDay(int hour) => hour switch
+    {
+        >= 6 and < 12 => "Morning",
+        >= 12 and < 18 => "Afternoon",
+        _ => "Night",
+    };
+
+    private static readonly string[] PartsOfDay = ["Morning", "Afternoon", "Night"];
+
+    /// <summary>
+    /// Runs by part of the day. Every bucket is listed even when empty: a gap is itself
+    /// worth seeing, and rows that come and go make the table hard to read across filters.
+    /// </summary>
+    private static IReadOnlyList<GroupRow> TimeOfDayOf(IReadOnlyList<RunRecord> runs)
+    {
+        if (runs.Count == 0)
+            return [];
+
+        var byPart = runs.ToLookup(run => PartOfDay(run.StartHour));
+        return PartsOfDay.Select(part => new GroupRow(part, Tally.Of(byPart[part].ToList()))).ToList();
+    }
+
+    /// <summary>Width of each block in <see cref="HourBlocksOf" />, in hours.</summary>
+    private const int HourBlockSize = 4;
+
+    private static IReadOnlyList<GroupRow> HourBlocksOf(IReadOnlyList<RunRecord> runs)
+    {
+        if (runs.Count == 0)
+            return [];
+
+        var byBlock = runs.ToLookup(run => run.StartHour / HourBlockSize);
+        return Enumerable
+            .Range(0, 24 / HourBlockSize)
+            .Select(block => new GroupRow(
+                $"{block * HourBlockSize:00}:00-{block * HourBlockSize + HourBlockSize - 1:00}:59",
+                Tally.Of(byBlock[block].ToList())))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Every card or relic that was picked, with the record of the runs that picked it.
+    ///
+    /// Ordered by win rate, then by how many runs back it up, so of two cards at the same
+    /// rate the better-evidenced one comes first. Nothing is hidden for being rare — the
+    /// record is shown beside the rate, which is what says whether a rate means anything.
+    /// </summary>
+    private static IReadOnlyList<PickRow> PicksOf(
+        IReadOnlyList<RunRecord> runs,
+        Func<RunRecord, IReadOnlyList<string>> picksOf)
+    {
+        var runsPerPick = new Dictionary<string, int>(StringComparer.Ordinal);
+        var winsPerPick = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        foreach (var run in runs)
+            foreach (var id in picksOf(run))
+            {
+                runsPerPick[id] = runsPerPick.GetValueOrDefault(id) + 1;
+                if (run.Win)
+                    winsPerPick[id] = winsPerPick.GetValueOrDefault(id) + 1;
+            }
+
+        return runsPerPick
+            .Select(pick => new PickRow(pick.Key, new Tally(pick.Value, winsPerPick.GetValueOrDefault(pick.Key))))
+            .OrderByDescending(row => row.Tally.WinRate)
+            .ThenByDescending(row => row.Tally.Runs)
+            .ThenBy(row => row.Id, StringComparer.Ordinal)
+            .ToList();
     }
 }

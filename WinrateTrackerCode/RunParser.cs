@@ -65,6 +65,8 @@ internal static class RunParser
                 Win = win,
                 Abandoned = ReadBoolean(root, "was_abandoned"),
                 Character = ReadCharacter(root),
+                PickedCards = ReadPicks(root, "deck"),
+                PickedRelics = ReadPicks(root, "relics"),
                 PlayerCount = ReadArrayLength(root, "players"),
                 RunTimeSeconds = ReadSingle(root, "run_time") ?? 0f,
                 Nodes = nodes,
@@ -115,6 +117,72 @@ internal static class RunParser
     /// <c>Infested Prisms Elite</c>. The <c>_ELITE</c>/<c>_BOSS</c> suffix is kept: in a
     /// deaths table it is the part that says which version of the fight killed you.
     /// </summary>
+    /// <summary>
+    /// Floor 1 holds what the run was handed rather than what it chose: the starting deck,
+    /// the starting relic, and any ascension curse. Picks begin above it.
+    /// </summary>
+    private const int FirstPickedFloor = 2;
+
+    /// <summary>
+    /// Ids repeat heavily — a few hundred cards across hundreds of runs — so they are
+    /// pooled. Without it the archive holds one string per card per run; with it, one per
+    /// distinct card. This is the same reason <see cref="RunRecord" /> keeps no deck.
+    ///
+    /// Not synchronised, and does not need to be: parsing only happens inside
+    /// <c>RunArchive.Load</c>, which its semaphore lets one caller into at a time. The
+    /// archive's own cache is a plain dictionary for the same reason.
+    /// </summary>
+    private static readonly Dictionary<string, string> IdPool = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The distinct ids in one of the player's lists that were added after the run started.
+    /// Reads only the first player: co-op runs are filtered out of every table anyway, and
+    /// the deck of someone else's character is not this player's pick.
+    /// </summary>
+    private static IReadOnlyList<string> ReadPicks(JsonElement root, string property)
+    {
+        if (!root.TryGetProperty("players", out var players) || players.ValueKind != JsonValueKind.Array)
+            return [];
+
+        using var player = players.EnumerateArray();
+        if (!player.MoveNext() || player.Current.ValueKind != JsonValueKind.Object)
+            return [];
+        if (!player.Current.TryGetProperty(property, out var entries) || entries.ValueKind != JsonValueKind.Array)
+            return [];
+
+        var picked = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var entry in entries.EnumerateArray())
+        {
+            if (entry.ValueKind != JsonValueKind.Object)
+                continue;
+            if ((ReadInt32(entry, "floor_added_to_deck") ?? 1) < FirstPickedFloor)
+                continue;
+            if (ReadString(entry, "id") is not { Length: > 0 } id)
+                continue;
+
+            var name = StripPrefix(id);
+            if (seen.Add(name))
+                picked.Add(Pool(name));
+        }
+        return picked;
+    }
+
+    /// <summary><c>CARD.SHIV</c> becomes <c>SHIV</c>, which is the key the game's own text tables use.</summary>
+    private static string StripPrefix(string id)
+    {
+        var lastDot = id.LastIndexOf('.');
+        return lastDot >= 0 ? id[(lastDot + 1)..] : id;
+    }
+
+    private static string Pool(string id)
+    {
+        if (IdPool.TryGetValue(id, out var pooled))
+            return pooled;
+        IdPool[id] = id;
+        return id;
+    }
+
     public static string CleanId(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw))

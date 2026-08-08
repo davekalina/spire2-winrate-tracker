@@ -25,7 +25,9 @@ internal static class TestRuns
         int elites = 2,
         float runTimeSeconds = 1800f,
         string killedBy = "",
-        string buildId = "v0.109.1") =>
+        string buildId = "v0.109.1",
+        IReadOnlyList<string>? cards = null,
+        IReadOnlyList<string>? relics = null) =>
         new()
         {
             FileName = $"{startTime}.run",
@@ -40,6 +42,8 @@ internal static class TestRuns
             ActReached = win ? 4 : actReached,
             Elites = elites,
             KilledBy = win ? "" : killedBy,
+            PickedCards = cards ?? [],
+            PickedRelics = relics ?? [],
             Patch = RunParser.PatchOf(buildId).Patch,
             PatchOrder = RunParser.PatchOf(buildId).Order,
         };

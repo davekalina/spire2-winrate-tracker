@@ -25,7 +25,7 @@ public class ReportTablesTests
     public void Every_tab_has_a_title()
     {
         Assert.Equal(
-            ["Overview", "Splits", "Characters"],
+            ["Overview", "Splits", "Characters", "Cards & Relics"],
             AllTabs.Select(ReportTables.Title));
     }
 
@@ -134,7 +134,7 @@ public class ReportTablesTests
         var sections = ReportTables.Build(ReportTab.Splits, Report("WL"));
 
         Assert.Equal(
-            ["By month", "By patch", "10-run blocks", "50-run blocks"],
+            ["By month", "By patch", "10-run blocks", "50-run blocks", "By time of day", "Every 4 hours"],
             sections.Select(section => section.Title));
         Assert.Equal("Jan 2026", sections[0].Rows[0][0].Text);
     }
@@ -143,12 +143,19 @@ public class ReportTablesTests
     public void Every_period_table_carries_a_series_matching_its_rows()
     {
         var report = Report(new string('L', 10) + new string('W', 10));
+        var sections = ReportTables.Build(ReportTab.Splits, report);
 
-        foreach (var section in ReportTables.Build(ReportTab.Splits, report))
+        // The four consecutive-stretch tables graph. The time-of-day tables are buckets,
+        // not a run of time, so they carry no series and must not claim to be graphable.
+        foreach (var title in new[] { "By month", "By patch", "10-run blocks", "50-run blocks" })
         {
+            var section = Assert.Single(sections, candidate => candidate.Title == title);
             Assert.NotNull(section.Series);
             Assert.Equal(section.Rows.Count, section.Series!.Count);
         }
+
+        foreach (var title in new[] { "By time of day", "Every 4 hours" })
+            Assert.False(Assert.Single(sections, candidate => candidate.Title == title).IsGraphable);
     }
 
     [Fact]
@@ -232,5 +239,53 @@ public class ReportTablesTests
         foreach (var section in ReportTables.Build(tab, report))
         foreach (var row in section.Rows)
             Assert.All(row, cell => Assert.InRange(cell.Parts.Count, 1, 2));
+    }
+
+    [Fact]
+    public void Time_of_day_lists_every_part_of_the_day_even_when_one_is_unplayed()
+    {
+        // TestRuns starts every run at noon, so all of them are afternoon runs.
+        var rows = Section(ReportTab.Splits, Report("WLW"), "By time of day").Rows;
+
+        Assert.Equal(["Morning", "Afternoon", "Night"], rows.Select(row => row[0].Text));
+        Assert.Equal(["Afternoon", "3", "2-1", "66.7%"], Texts(rows[1]));
+        Assert.Equal("0", rows[0][1].Text);
+    }
+
+    [Fact]
+    public void Four_hour_blocks_cover_the_whole_day_in_six_rows()
+    {
+        var rows = Section(ReportTab.Splits, Report("WL"), "Every 4 hours").Rows;
+
+        Assert.Equal(6, rows.Count);
+        Assert.Equal("00:00-03:59", rows[0][0].Text);
+        Assert.Equal("20:00-23:59", rows[5][0].Text);
+        // Noon runs land in the 12:00 block.
+        Assert.Equal(["12:00-15:59", "2", "1-1", "50.0%"], Texts(rows[3]));
+    }
+
+    [Fact]
+    public void Picks_lead_with_the_best_card_and_show_what_backs_it_up()
+    {
+        var runs = new List<RunRecord>
+        {
+            Run(Unix(2026, 1, 1), win: true, cards: ["SHIV"], relics: ["KUNAI"]),
+            Run(Unix(2026, 1, 2), win: true, cards: ["SHIV", "CLASH"]),
+            Run(Unix(2026, 1, 3), cards: ["CLASH"]),
+        };
+
+        var sections = ReportTables.Build(ReportTab.Picks, WinrateReport.Build(runs));
+
+        Assert.Equal(["Cards", "Relics"], sections.Select(section => section.Title));
+        // Shiv 2-0 outranks Clash 1-1, and the record sits beside the rate.
+        Assert.Equal(["Shiv", "2", "2-0", "100.0%"], Texts(sections[0].Rows[0]));
+        Assert.Equal(["Clash", "2", "1-1", "50.0%"], Texts(sections[0].Rows[1]));
+        Assert.Equal(["Kunai", "1", "1-0", "100.0%"], Texts(sections[1].Rows[0]));
+    }
+
+    [Fact]
+    public void Runs_with_nothing_picked_build_no_pick_tables_at_all()
+    {
+        Assert.Empty(ReportTables.Build(ReportTab.Picks, Report("WLW")));
     }
 }

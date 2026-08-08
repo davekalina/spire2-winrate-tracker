@@ -49,6 +49,7 @@ internal enum ReportTab
     Overview,
     Splits,
     Characters,
+    Picks,
 }
 
 /// <summary>
@@ -65,6 +66,7 @@ internal static class ReportTables
         ReportTab.Overview => "Overview",
         ReportTab.Splits => "Splits",
         ReportTab.Characters => "Characters",
+        ReportTab.Picks => "Cards & Relics",
         _ => tab.ToString(),
     };
 
@@ -73,6 +75,7 @@ internal static class ReportTables
         ReportTab.Overview => Overview(report),
         ReportTab.Splits => Splits(report),
         ReportTab.Characters => Characters(report),
+        ReportTab.Picks => Picks(report),
         _ => [],
     };
 
@@ -118,8 +121,9 @@ internal static class ReportTables
     }
 
     /// <summary>
-    /// Every way of cutting the archive into consecutive stretches: by month, by patch,
-    /// and by fixed-size blocks. All four are the same shape, so all four graph.
+    /// Every way of cutting the archive up: first the consecutive stretches — by month, by
+    /// patch, by fixed-size blocks — which are all the same shape and so all graph, then
+    /// the two cuts by time of day, which are not stretches of time and do not.
     /// </summary>
     private static IReadOnlyList<TableSection> Splits(WinrateReport report)
     {
@@ -134,8 +138,31 @@ internal static class ReportTables
             // with a zero after it.
             PeriodSection("10-run blocks", report.Blocks10, "block", withOwnRate: false),
             PeriodSection("50-run blocks", report.Blocks50, "block"),
+            GroupSection("By time of day", report.TimeOfDay, "time"),
+            GroupSection("Every 4 hours", report.HourBlocks, "hours"),
         ];
     }
+
+    /// <summary>
+    /// A table of named buckets. No from/to and no cumulative column: these rows are not
+    /// consecutive, so a running total across them would mean nothing.
+    /// </summary>
+    private static TableSection GroupSection(string title, IReadOnlyList<GroupRow> groups, string labelHeader) =>
+        new(
+            title,
+            [
+                new TableColumn(labelHeader),
+                new TableColumn("runs", RightAligned: true),
+                new TableColumn("record", RightAligned: true),
+                new TableColumn("win%", RightAligned: true),
+            ],
+            groups.Select(group => (IReadOnlyList<TableCell>)
+            [
+                group.Label,
+                Format.Count(group.Tally.Runs),
+                Format.WinLoss(group.Tally),
+                Format.Percent(group.Tally),
+            ]).ToList());
 
     private static TableSection PeriodSection(
         string title,
@@ -225,4 +252,50 @@ internal static class ReportTables
 
         return [byCharacter, matrix];
     }
+
+    /// <summary>
+    /// What picking each card, and then each relic, was worth.
+    ///
+    /// Both are every pick the filtered runs made, best win rate first. The starting deck
+    /// and starting relic are not picks and are left out upstream, in
+    /// <see cref="RunRecord.PickedCards" />.
+    ///
+    /// The record sits beside the rate on purpose. Sorted by rate alone the head of the
+    /// list is whatever was picked once and won, so the column that says how many runs are
+    /// behind a number has to be right there next to it.
+    /// </summary>
+    private static IReadOnlyList<TableSection> Picks(WinrateReport report)
+    {
+        if (report.IsEmpty)
+            return [];
+
+        // Runs from before the mod could read decks, or a filter that leaves only such
+        // runs, have no picks to show. A heading over nothing is worse than no heading.
+        return new[]
+        {
+            PickSection("Cards", "card", report.Cards, Format.CardName),
+            PickSection("Relics", "relic", report.Relics, Format.RelicName),
+        }.Where(section => !section.IsEmpty).ToList();
+    }
+
+    private static TableSection PickSection(
+        string title,
+        string labelHeader,
+        IReadOnlyList<PickRow> picks,
+        Func<string, string> nameOf) =>
+        new(
+            title,
+            [
+                new TableColumn(labelHeader),
+                new TableColumn("picked", RightAligned: true),
+                new TableColumn("record", RightAligned: true),
+                new TableColumn("win%", RightAligned: true),
+            ],
+            picks.Select(pick => (IReadOnlyList<TableCell>)
+            [
+                nameOf(pick.Id),
+                Format.Count(pick.Tally.Runs),
+                Format.WinLoss(pick.Tally),
+                Format.Percent(pick.Tally),
+            ]).ToList());
 }

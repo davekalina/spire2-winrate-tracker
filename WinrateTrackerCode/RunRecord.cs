@@ -47,6 +47,21 @@ internal sealed record RunRecord
     public int Rests { get; init; }
     public int Events { get; init; }
 
+    /// <summary>
+    /// Raw ids of the cards this run picked up, without duplicates — <c>SHIV</c>, not
+    /// <c>CARD.SHIV</c>. The starting deck is left out: it is the same every run of a
+    /// character, so it says nothing about what picking a card is worth. Duplicates are
+    /// dropped because the question is per run, not per copy — taking three Shivs is still
+    /// one run that had Shiv in it.
+    /// </summary>
+    public IReadOnlyList<string> PickedCards { get; init; } = [];
+
+    /// <summary>Raw ids of the relics picked up, on the same terms as <see cref="PickedCards" />.</summary>
+    public IReadOnlyList<string> PickedRelics { get; init; } = [];
+
+    /// <summary>The hour of the day the run began, 0-23, in local time.</summary>
+    public int StartHour => LocalStart.Hour;
+
     /// <summary>Display name of the encounter that ended the run, or empty on a win.</summary>
     public string KilledBy { get; init; } = "";
 
