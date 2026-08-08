@@ -13,4 +13,7 @@ internal static class WinrateSession
     public static RunFilter Filter { get; set; } = RunFilter.Default;
 
     public static ReportTab Tab { get; set; } = ReportTab.Overview;
+
+    /// <summary>What the Cards and Relics tabs are narrowed to. Only those tabs read it.</summary>
+    public static PickFilter Picks { get; set; } = PickFilter.Default;
 }

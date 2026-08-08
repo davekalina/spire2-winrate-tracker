@@ -49,7 +49,8 @@ internal enum ReportTab
     Overview,
     Splits,
     Characters,
-    Picks,
+    Cards,
+    Relics,
 }
 
 /// <summary>
@@ -66,16 +67,26 @@ internal static class ReportTables
         ReportTab.Overview => "Overview",
         ReportTab.Splits => "Splits",
         ReportTab.Characters => "Characters",
-        ReportTab.Picks => "Cards & Relics",
+        ReportTab.Cards => "Cards",
+        ReportTab.Relics => "Relics",
         _ => tab.ToString(),
     };
 
-    public static IReadOnlyList<TableSection> Build(ReportTab tab, WinrateReport report) => tab switch
+    /// <summary>
+    /// <paramref name="picks" /> narrows the Cards and Relics tabs only. It is a separate
+    /// argument rather than part of the report because it hides rows, not runs — the win
+    /// rate of a card must not change according to which other cards are on screen.
+    /// </summary>
+    public static IReadOnlyList<TableSection> Build(
+        ReportTab tab,
+        WinrateReport report,
+        PickFilter? picks = null) => tab switch
     {
         ReportTab.Overview => Overview(report),
         ReportTab.Splits => Splits(report),
         ReportTab.Characters => Characters(report),
-        ReportTab.Picks => Picks(report),
+        ReportTab.Cards => Picks(report, picks ?? PickFilter.Default, ReportTab.Cards),
+        ReportTab.Relics => Picks(report, picks ?? PickFilter.Default, ReportTab.Relics),
         _ => [],
     };
 
@@ -132,10 +143,10 @@ internal static class ReportTables
 
         return
         [
-            PeriodSection("By month", report.Months, "month", withFloors: true),
+            // The month is the date, so a from and a to beside it say nothing the label
+            // has not already said.
+            PeriodSection("By month", report.Months, "month", withFloors: true, withDates: false),
             PeriodSection("By patch", report.Patches, "patch"),
-            // A block of exactly ten runs needs no win% column: the record is the rate
-            // with a zero after it.
             PeriodSection("10-run blocks", report.Blocks10, "block", withOwnRate: false),
             PeriodSection("50-run blocks", report.Blocks50, "block"),
             GroupSection("By time of day", report.TimeOfDay, "time"),
@@ -169,31 +180,36 @@ internal static class ReportTables
         IReadOnlyList<PeriodRow> periods,
         string labelHeader,
         bool withFloors = false,
-        bool withOwnRate = true)
+        bool withOwnRate = true,
+        bool withDates = true)
     {
-        List<TableColumn> columns =
-        [
-            new(labelHeader),
-            new("from", RightAligned: true),
-            new("to", RightAligned: true),
-            new(withOwnRate ? "record" : "W-L", RightAligned: true),
-            new("cumulative%", RightAligned: true),
-        ];
+        List<TableColumn> columns = [new(labelHeader)];
+        if (withDates)
+        {
+            columns.Add(new TableColumn("from", RightAligned: true));
+            columns.Add(new TableColumn("to", RightAligned: true));
+        }
+        columns.Add(new TableColumn("record", RightAligned: true));
+        // A block of exactly ten runs needs no win% column: the record is the rate with a
+        // zero after it.
+        if (withOwnRate)
+            columns.Add(new TableColumn("win%", RightAligned: true));
+        columns.Add(new TableColumn("cumulative%", RightAligned: true));
         if (withFloors)
             columns.Add(new TableColumn("avg floors", RightAligned: true));
 
         var rows = periods.Select(period =>
         {
-            List<TableCell> cells =
-            [
-                period.Label,
-                Format.ShortDate(period.From),
-                Format.ShortDate(period.To),
-                withOwnRate
-                    ? TableCell.Pair(Format.WinLoss(period.Tally), Format.WholePercent(period.Tally))
-                    : Format.WinLoss(period.Tally),
-                Format.Percent(period.CumulativeWinRate),
-            ];
+            List<TableCell> cells = [period.Label];
+            if (withDates)
+            {
+                cells.Add(Format.ShortDate(period.From));
+                cells.Add(Format.ShortDate(period.To));
+            }
+            cells.Add(Format.WinLoss(period.Tally));
+            if (withOwnRate)
+                cells.Add(Format.WholePercent(period.Tally));
+            cells.Add(Format.Percent(period.CumulativeWinRate));
             if (withFloors)
                 cells.Add(Format.Average(period.AverageFloors));
             return (IReadOnlyList<TableCell>)cells;
@@ -254,39 +270,43 @@ internal static class ReportTables
     }
 
     /// <summary>
-    /// What picking each card, and then each relic, was worth.
+    /// What picking each card, or each relic, was worth.
     ///
-    /// Both are every pick the filtered runs made, best win rate first. The starting deck
-    /// and starting relic are not picks and are left out upstream, in
+    /// Every pick the filtered runs made, best win rate first. The starting deck and
+    /// starting relic are not picks and are left out upstream, in
     /// <see cref="RunRecord.PickedCards" />.
     ///
-    /// The record sits beside the rate on purpose. Sorted by rate alone the head of the
+    /// The pick count sits beside the rate on purpose. Sorted by rate alone the head of the
     /// list is whatever was picked once and won, so the column that says how many runs are
     /// behind a number has to be right there next to it.
+    ///
+    /// The table carries no heading of its own: the tab is already named for it, and a
+    /// second "Cards" in gold under the Cards tab says nothing.
     /// </summary>
-    private static IReadOnlyList<TableSection> Picks(WinrateReport report)
+    private static IReadOnlyList<TableSection> Picks(WinrateReport report, PickFilter filter, ReportTab tab)
     {
         if (report.IsEmpty)
             return [];
 
-        // Runs from before the mod could read decks, or a filter that leaves only such
-        // runs, have no picks to show. A heading over nothing is worse than no heading.
-        return new[]
-        {
-            PickSection("Cards", "card", report.Cards, Format.CardName),
-            PickSection("Relics", "relic", report.Relics, Format.RelicName),
-        }.Where(section => !section.IsEmpty).ToList();
+        var section = tab == ReportTab.Cards
+            ? PickSection("card", filter.ApplyToCards(report.Cards), GameData.CardName)
+            : PickSection("relic", filter.ApplyToRelics(report.Relics), GameData.RelicName);
+
+        // Runs from before the mod could read decks, a run filter that leaves only such
+        // runs, or a minimum that nothing clears: all of them can empty the list, and the
+        // tab should then say so rather than draw an empty frame.
+        return section.IsEmpty ? [] : [section];
     }
 
     private static TableSection PickSection(
-        string title,
         string labelHeader,
         IReadOnlyList<PickRow> picks,
         Func<string, string> nameOf) =>
         new(
-            title,
+            "",
             [
                 new TableColumn(labelHeader),
+                new TableColumn("rarity"),
                 new TableColumn("picked", RightAligned: true),
                 new TableColumn("record", RightAligned: true),
                 new TableColumn("win%", RightAligned: true),
@@ -294,6 +314,7 @@ internal static class ReportTables
             picks.Select(pick => (IReadOnlyList<TableCell>)
             [
                 nameOf(pick.Id),
+                pick.Rarity,
                 Format.Count(pick.Tally.Runs),
                 Format.WinLoss(pick.Tally),
                 Format.Percent(pick.Tally),

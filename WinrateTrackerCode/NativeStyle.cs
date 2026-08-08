@@ -64,6 +64,21 @@ internal static class NativeStyle
     /// <summary>The translucent slate behind a stats block, from its <c>ColorRect</c>.</summary>
     public static readonly Color PanelColor = new(0.1159f, 0.16777f, 0.19f, 0.501961f);
 
+    /// <summary>
+    /// The band behind the filter rows, which is the same slate but solid.
+    ///
+    /// It cannot be translucent like <see cref="PanelColor" />. A table panel is
+    /// translucent over the menu art behind the screen, which is fine; this band has the
+    /// scrolling tables passing underneath it, and at half alpha they read straight
+    /// through the filters. The screen has no background of its own to tint against — it
+    /// draws over whatever the menu is showing — so the only way to stop the overdraw is
+    /// to be opaque.
+    ///
+    /// The value is the panel slate laid over darkness and lifted a little, so the band
+    /// still reads as the same material as the panels below rather than as a black bar.
+    /// </summary>
+    public static readonly Color HeaderBandColor = new(0.072f, 0.104f, 0.118f, 1f);
+
     public static readonly Color CellColor = StsColors.cream;
     public static readonly Color ColumnHeaderColor = StsColors.halfTransparentCream;
     public static readonly Color NoteColor = StsColors.halfTransparentCream;

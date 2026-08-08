@@ -52,11 +52,11 @@ internal sealed record CountRow(string Label, int Count);
 internal sealed record GroupRow(string Label, Tally Tally);
 
 /// <summary>
-/// One card or relic and how the runs that picked it went. Carries the raw id rather than
-/// a name: the game's text tables are what turn <c>SHIV</c> into "Shiv", and they live on
-/// the other side of the line that keeps this file testable without the game.
+/// One card or relic and how the runs that picked it went. Carries the raw id as well as
+/// the name, because the id is what the tables and the filters agree on; see
+/// <see cref="GameData" /> for where the name and the rarity come from.
 /// </summary>
-internal sealed record PickRow(string Id, Tally Tally);
+internal sealed record PickRow(string Id, string Rarity, Tally Tally);
 
 /// <summary>
 /// A labelled row of the month-by-character grid. A null cell is a month that character
@@ -172,8 +172,8 @@ internal sealed record WinrateReport
             LossesByAct = LossesByActOf(losses),
             TimeOfDay = TimeOfDayOf(runs),
             HourBlocks = HourBlocksOf(runs),
-            Cards = PicksOf(runs, run => run.PickedCards),
-            Relics = PicksOf(runs, run => run.PickedRelics),
+            Cards = PicksOf(runs, run => run.PickedCards, GameData.Cards),
+            Relics = PicksOf(runs, run => run.PickedRelics, GameData.Relics),
         };
     }
 
@@ -416,7 +416,8 @@ internal sealed record WinrateReport
     /// </summary>
     private static IReadOnlyList<PickRow> PicksOf(
         IReadOnlyList<RunRecord> runs,
-        Func<RunRecord, IReadOnlyList<string>> picksOf)
+        Func<RunRecord, IReadOnlyList<string>> picksOf,
+        string table)
     {
         var runsPerPick = new Dictionary<string, int>(StringComparer.Ordinal);
         var winsPerPick = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -430,7 +431,10 @@ internal sealed record WinrateReport
             }
 
         return runsPerPick
-            .Select(pick => new PickRow(pick.Key, new Tally(pick.Value, winsPerPick.GetValueOrDefault(pick.Key))))
+            .Select(pick => new PickRow(
+                pick.Key,
+                GameData.RarityOf(table, pick.Key),
+                new Tally(pick.Value, winsPerPick.GetValueOrDefault(pick.Key))))
             .OrderByDescending(row => row.Tally.WinRate)
             .ThenByDescending(row => row.Tally.Runs)
             .ThenBy(row => row.Id, StringComparer.Ordinal)

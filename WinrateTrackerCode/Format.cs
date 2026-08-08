@@ -85,24 +85,4 @@ internal static class Format
         return $"{length} {noun}";
     }
 
-    /// <summary>
-    /// Turns a raw id into the name the game shows for it. Set once at start-up to the
-    /// game's own text tables; see <c>GameText</c>.
-    ///
-    /// A hook rather than a direct call because everything in this file is covered by tests
-    /// that run without the game assembly loaded. Left unset, names fall back to the id
-    /// tidied up, which is readable enough to be worth having if the tables ever move.
-    /// </summary>
-    public static Func<string, string, string?>? NameLookup;
-
-    /// <summary>The card's name, e.g. <c>SHIV</c> becomes "Shiv".</summary>
-    public static string CardName(string id) => Name("cards", id);
-
-    public static string RelicName(string id) => Name("relics", id);
-
-    private static string Name(string table, string id)
-    {
-        var found = NameLookup?.Invoke(table, id);
-        return string.IsNullOrWhiteSpace(found) ? RunParser.CleanId(id) : found;
-    }
 }

@@ -25,7 +25,7 @@ public class ReportTablesTests
     public void Every_tab_has_a_title()
     {
         Assert.Equal(
-            ["Overview", "Splits", "Characters", "Cards & Relics"],
+            ["Overview", "Splits", "Characters", "Cards", "Relics"],
             AllTabs.Select(ReportTables.Title));
     }
 
@@ -97,7 +97,7 @@ public class ReportTablesTests
 
         // A block of ten needs no rate of its own.
         Assert.Equal(
-            ["block", "from", "to", "W-L", "cumulative%"],
+            ["block", "from", "to", "record", "cumulative%"],
             section.Columns.Select(column => column.Header));
         Assert.Equal(["11-20", "01-11", "01-20", "10-0", "50.0%"], Texts(section.Rows[0]));
         Assert.Equal(["1-10", "01-01", "01-10", "0-10", "0.0%"], Texts(section.Rows[1]));
@@ -112,20 +112,45 @@ public class ReportTablesTests
         var ten = Assert.Single(sections, section => section.Title == "10-run blocks");
         var fifty = Assert.Single(sections, section => section.Title == "50-run blocks");
 
-        Assert.Single(ten.Rows[0][3].Parts);
-        Assert.Equal(2, fifty.Rows[0][3].Parts.Count);
+        Assert.DoesNotContain("win%", ten.Columns.Select(column => column.Header));
+        Assert.Contains("win%", fifty.Columns.Select(column => column.Header));
     }
 
     [Fact]
-    public void A_record_and_its_rate_share_one_column_as_two_parts()
+    public void A_period_keeps_its_record_and_its_rate_in_columns_of_their_own()
     {
         var section = Section(ReportTab.Splits, Report(new string('W', 60)), "By patch");
 
-        // One heading, not a W-L column and a win% column either side of a column gap.
         Assert.Equal(
-            ["patch", "from", "to", "record", "cumulative%"],
+            ["patch", "from", "to", "record", "win%", "cumulative%"],
             section.Columns.Select(column => column.Header));
-        Assert.Equal(["60-0", "100%"], section.Rows[0][3].Parts);
+        Assert.Equal("60-0", section.Rows[0][3].Text);
+        Assert.Equal("100%", section.Rows[0][4].Text);
+    }
+
+    [Fact]
+    public void A_month_is_its_own_date_and_carries_no_from_or_to()
+    {
+        var section = Section(ReportTab.Splits, Report("WL"), "By month");
+
+        Assert.Equal(
+            ["month", "record", "win%", "cumulative%", "avg floors"],
+            section.Columns.Select(column => column.Header));
+        Assert.Equal("Jan 2026", section.Rows[0][0].Text);
+        Assert.Equal("1-1", section.Rows[0][1].Text);
+    }
+
+    /// <summary>
+    /// The Characters tab still pairs a record with its rate inside one column. It has one
+    /// column per character, so splitting them there is what made the table too wide — the
+    /// reason the paired cell exists at all.
+    /// </summary>
+    [Fact]
+    public void A_character_keeps_its_record_and_rate_paired_in_one_column()
+    {
+        var section = Section(ReportTab.Characters, Report(new string('W', 60)), "By character");
+
+        Assert.Equal(["60-0", "100%"], section.Rows[0][2].Parts);
     }
 
     [Fact]
@@ -274,18 +299,51 @@ public class ReportTablesTests
             Run(Unix(2026, 1, 3), cards: ["CLASH"]),
         };
 
-        var sections = ReportTables.Build(ReportTab.Picks, WinrateReport.Build(runs));
+        var report = WinrateReport.Build(runs);
+        var cards = Assert.Single(ReportTables.Build(ReportTab.Cards, report));
+        var relics = Assert.Single(ReportTables.Build(ReportTab.Relics, report));
 
-        Assert.Equal(["Cards", "Relics"], sections.Select(section => section.Title));
-        // Shiv 2-0 outranks Clash 1-1, and the record sits beside the rate.
-        Assert.Equal(["Shiv", "2", "2-0", "100.0%"], Texts(sections[0].Rows[0]));
-        Assert.Equal(["Clash", "2", "1-1", "50.0%"], Texts(sections[0].Rows[1]));
-        Assert.Equal(["Kunai", "1", "1-0", "100.0%"], Texts(sections[1].Rows[0]));
+        // No heading: the tab is already named for the table.
+        Assert.Equal("", cards.Title);
+        // Shiv 2-0 outranks Clash 1-1, and the pick count sits beside the rate. Rarity is
+        // unknown here: it comes from the game's models, which no test loads.
+        Assert.Equal(["Shiv", "—", "2", "2-0", "100.0%"], Texts(cards.Rows[0]));
+        Assert.Equal(["Clash", "—", "2", "1-1", "50.0%"], Texts(cards.Rows[1]));
+        Assert.Equal(["Kunai", "—", "1", "1-0", "100.0%"], Texts(relics.Rows[0]));
+    }
+
+    [Fact]
+    public void The_minimum_and_the_rarity_narrow_only_the_tab_they_belong_to()
+    {
+        var runs = new List<RunRecord>
+        {
+            Run(Unix(2026, 1, 1), win: true, cards: ["SHIV"], relics: ["KUNAI"]),
+            Run(Unix(2026, 1, 2), win: true, cards: ["SHIV"]),
+            Run(Unix(2026, 1, 3), cards: ["CLASH"]),
+        };
+        var report = WinrateReport.Build(runs);
+
+        var cards = Assert.Single(ReportTables.Build(
+            ReportTab.Cards, report, new PickFilter { MinimumPicks = 2 }));
+
+        // Clash was picked once and drops out; the runs behind Shiv are untouched by it.
+        Assert.Equal("Shiv", Assert.Single(cards.Rows)[0].Text);
+        Assert.Equal("2-0", cards.Rows[0][3].Text);
+    }
+
+    [Fact]
+    public void A_pick_tab_with_nothing_left_after_filtering_builds_no_table()
+    {
+        var runs = new List<RunRecord> { Run(Unix(2026, 1, 1), win: true, cards: ["SHIV"]) };
+
+        Assert.Empty(ReportTables.Build(
+            ReportTab.Cards, WinrateReport.Build(runs), new PickFilter { MinimumPicks = 5 }));
     }
 
     [Fact]
     public void Runs_with_nothing_picked_build_no_pick_tables_at_all()
     {
-        Assert.Empty(ReportTables.Build(ReportTab.Picks, Report("WLW")));
+        Assert.Empty(ReportTables.Build(ReportTab.Cards, Report("WLW")));
+        Assert.Empty(ReportTables.Build(ReportTab.Relics, Report("WLW")));
     }
 }

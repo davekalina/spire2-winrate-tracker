@@ -39,6 +39,13 @@ internal sealed class WinrateScreen : IDisposable
     /// <summary>Clears the tab row and the filter row above it.</summary>
     private const int ContentMarginTop = 288;
 
+    /// <summary>
+    /// Extra height the filter band takes on the Cards and Relics tabs, where a second row
+    /// of filters appears. The content and the scrollbar drop by the same amount, so the
+    /// band never covers the table under it.
+    /// </summary>
+    private const float PickRowHeight = 96f;
+
     private const int ContentMarginBottom = 100;
 
     /// <summary>Filter row position, below the tabs, in the screen's 1920x1080 reference frame.</summary>
@@ -57,6 +64,12 @@ internal sealed class WinrateScreen : IDisposable
 
     /// <summary>Matches the game's own top-bar gear, which is drawn at 64 px.</summary>
     private const float GearSize = 64f;
+
+    /// <summary>From <c>settings_tab.tscn</c>, whose root has a 256x90 minimum.</summary>
+    private const float TabWidth = 256f;
+
+    /// <summary>The scene's own separation between tabs.</summary>
+    private const float TabSeparation = 12f;
 
     /// <summary>
     /// Byline placement, in the bottom-left corner under the back button — which the
@@ -82,6 +95,9 @@ internal sealed class WinrateScreen : IDisposable
     // Assigned in Build, which the constructor calls inside a try so a failure can tear
     // the screen back down.
     private FilterBar _filters = null!;
+    private MarginContainer? _contentInset;
+    private PickFilterBar _pickFilters = null!;
+    private Control _filterFrame = null!;
     private VBoxContainer _content = null!;
     private MegaLabel _summary = null!;
     private GraphPopup? _graph;
@@ -120,6 +136,9 @@ internal sealed class WinrateScreen : IDisposable
         _filters = new FilterBar();
         _filters.Changed += Rebuild;
 
+        _pickFilters = new PickFilterBar();
+        _pickFilters.Changed += Rebuild;
+
         _summary = NativeStyle.Cell("", rightAligned: false, header: true);
         _summary.HorizontalAlignment = HorizontalAlignment.Center;
 
@@ -138,6 +157,11 @@ internal sealed class WinrateScreen : IDisposable
         // Where the cursor lands on a gamepad. Registered before anything can ask, and
         // asked lazily, because the filter row is not built yet.
         ScreenFocusPatch.SetDefaultControl(_screen, () => _filters.Controls.FirstOrDefault());
+
+        // The scene sizes its row for two tabs; this screen has five and a gear beside
+        // them. Each tab is 256 wide, so the row has to be told it is allowed to be wider
+        // or the outer tabs are laid out past its edge.
+        WidenTabRow(tabContainer.GetParent() as Control);
 
         _tabs.AddRange(tabContainer.GetChildren().OfType<NSettingsTab>());
         for (var i = 0; i < _tabs.Count && i < TabCount; i++)
@@ -168,7 +192,21 @@ internal sealed class WinrateScreen : IDisposable
         _screen.AddChild(BuildByline());
         // Added last so the filter row sits above the scroll body in draw order.
         _screen.AddChild(BuildFilterRow());
+        LayOutForTab();
         WireGamepad();
+    }
+
+    /// <summary>
+    /// Give the tab row room for every tab. Anchored to the screen's centre like the scene
+    /// has it, so it stays put at any resolution.
+    /// </summary>
+    private void WidenTabRow(Control? tabRow)
+    {
+        if (tabRow is null || !tabRow.IsValid())
+            return;
+        var half = ((TabCount * TabWidth) + ((TabCount - 1) * TabSeparation) + GearSize + TabSeparation) / 2f;
+        tabRow.OffsetLeft = -half;
+        tabRow.OffsetRight = half;
     }
 
     /// <summary>The scroll track.</summary>
@@ -176,25 +214,18 @@ internal sealed class WinrateScreen : IDisposable
         _screen.GetNodeOrNull<Control>("%StatsGrid/ScrollableContent/Scrollbar");
 
     /// <summary>
-    /// Drop the scrollbar below the filter row. The scene anchors it for a screen whose
-    /// content starts under the tabs; this one has a header strip in between, and the
-    /// scrollbar was running up behind it.
+    /// Let the scrollbar be shortened from the top.
+    ///
+    /// <see cref="LayOutForTab" /> drops its top edge below the filter band, but moving the
+    /// top alone is not enough: the scene gives the scrollbar a minimum height of 800 and
+    /// grows it from its centre, so a shorter rect is expanded back out in both directions,
+    /// putting the top straight back under the filters. Growing downwards instead is what
+    /// makes the shorter rect stick.
     /// </summary>
     private void LowerScrollbar()
     {
-        if (Scrollbar is not { } scrollbar)
-            return;
-
-        scrollbar.OffsetTop = FilterRowTop + FilterRowHeight + ScrollbarGap;
-
-        // Moving the top alone is not enough. The scene gives the scrollbar a minimum
-        // height of 800 and grows it from its centre, so a shorter rect is expanded back
-        // out in both directions — putting the top straight back under the filter row.
-        // The minimum has to come down with it, and any remaining growth has to go down.
-        scrollbar.CustomMinimumSize = new Vector2(
-            scrollbar.CustomMinimumSize.X,
-            Math.Max(0f, scrollbar.OffsetBottom - scrollbar.OffsetTop));
-        scrollbar.GrowVertical = Control.GrowDirection.End;
+        if (Scrollbar is { } scrollbar)
+            scrollbar.GrowVertical = Control.GrowDirection.End;
     }
 
     /// <summary>
@@ -216,12 +247,21 @@ internal sealed class WinrateScreen : IDisposable
     /// Nothing is intercepted to do it. The game binds its d-pad to <c>ui_up</c> and
     /// friends — <c>MegaInput.up</c> is that string — which is Godot's own focus-navigation
     /// action, so a correct set of focus neighbours is the whole implementation.
-    /// <see cref="LinkTopSection" /> lays them out; <c>ui_select</c> presses whatever they
+    /// <see cref="RelinkFocus" /> lays them out; <c>ui_select</c> presses whatever they
     /// land on.
     /// </summary>
     private void WireGamepad()
     {
-        LinkTopSection();
+        // Created once. Its stand-in is a node on the screen, so relinking must not build
+        // another one. It watches both filter rows, and hands the cursor back to whichever
+        // control was last on.
+        if (_screen.GetNodeOrNull<NScrollableContainer>("%StatsGrid/ScrollableContent") is { } scroll)
+            _scrollCursor = new ScrollCursor(
+                _screen,
+                scroll,
+                _filters.Controls.Concat(_pickFilters.Controls).ToList());
+
+        RelinkFocus();
 
         _screen.Connect(CanvasItem.SignalName.VisibilityChanged, Callable.From(() =>
         {
@@ -231,68 +271,89 @@ internal sealed class WinrateScreen : IDisposable
     }
 
     /// <summary>
-    /// Chain the tab row and the filter row into a closed loop of focus stops.
+    /// Chain every row of controls into one closed run of focus stops.
     ///
-    /// Every one of the four neighbours is set on every control, and none of them points
-    /// outside these two rows. That is what keeps the cursor off the tables, and it has to
-    /// be exhaustive: Godot only falls back to searching the screen geometrically when a
-    /// neighbour is left unset, and that search will happily find something below. The
-    /// tables carry no focus stops of their own either — see
-    /// <see cref="SealScrollContent" /> — so the only way into them is the one
-    /// <see cref="ScrollCursor" /> provides.
+    /// The rows are the tabs and the gear, the run filters, and — only on the Cards &amp;
+    /// Relics tabs — the pick filters. Up and down step between neighbouring rows, left and
+    /// right walk along one, and down out of the last row reaches the tables through
+    /// <see cref="ScrollCursor" />.
     ///
-    /// Down from the tab row reaches the filters and up comes back, landing on the control
-    /// nearest the one being left rather than jumping across. Up from the tabs does nothing;
-    /// down from the filters drops into the tables. Left and right walk each row: the tabs
-    /// then the gear on top, the six filter arrows below.
+    /// Every one of the four neighbours is set on every control, and none points anywhere
+    /// but at these rows. That has to be exhaustive: Godot only falls back to searching the
+    /// screen geometrically when a neighbour is left unset, and that search will happily
+    /// find something in the tables. They hold no focus stops of their own either — see
+    /// <see cref="SealScrollContent" /> — so a missed neighbour has nothing to land on.
+    ///
+    /// Re-run whenever the rows change, which means on every tab switch.
     /// </summary>
-    private void LinkTopSection()
+    private void RelinkFocus()
     {
-        var top = _tabs.Cast<Control>().Where(control => control.IsValid()).ToList();
+        var rows = new List<List<Control>>();
+
+        var tabs = _tabs.Cast<Control>().Where(control => control.IsValid()).ToList();
         if (_gear is not null && _gear.IsValid())
-            top.Add(_gear);
-        var bottom = _filters.Controls.Where(control => control.IsValid()).ToList();
-        if (top.Count == 0 || bottom.Count == 0)
+            tabs.Add(_gear);
+        if (tabs.Count > 0)
+            rows.Add(tabs);
+
+        AddRow(rows, _filters.Controls);
+        if (_pickFilters.Root.IsValid() && _pickFilters.Root.Visible)
+            AddRow(rows, _pickFilters.Controls);
+
+        if (rows.Count == 0)
             return;
 
-        Chain(top, bottom, otherRowIsBelow: true);
-        Chain(bottom, top, otherRowIsBelow: false);
+        for (var i = 0; i < rows.Count; i++)
+            Chain(rows[i], i > 0 ? rows[i - 1] : null, i < rows.Count - 1 ? rows[i + 1] : null);
 
-        // Down out of the filter row reaches the tables. Nothing in them can take focus, so
-        // a stand-in does it and turns the d-pad into scrolling; see ScrollCursor.
-        if (_screen.GetNodeOrNull<NScrollableContainer>("%StatsGrid/ScrollableContent") is { } scroll)
-        {
-            _scrollCursor = new ScrollCursor(_screen, scroll, bottom);
-            foreach (var control in bottom)
+        // The last row is the one that opens onto the tables.
+        if (_scrollCursor is not null && _scrollCursor.Proxy.IsValid())
+            foreach (var control in rows[^1])
                 control.FocusNeighborBottom = _scrollCursor.Proxy.GetPath();
-        }
 
         SealScrollContent();
     }
 
+    private static void AddRow(List<List<Control>> rows, IEnumerable<Control> controls)
+    {
+        var row = controls.Where(control => control.IsValid()).ToList();
+        if (row.Count > 0)
+            rows.Add(row);
+    }
+
     /// <summary>
-    /// Wire one row: left and right along it, and one vertical direction onto
-    /// <paramref name="other" /> — scaled so the ends of a short row still reach the ends
-    /// of a long one. The opposite vertical direction points back at the control itself,
-    /// so the top row has nothing above it and the bottom row has nothing below it.
+    /// Wire one row: left and right along it, up and down onto its neighbouring rows —
+    /// scaled so the ends of a short row still reach the ends of a long one. A missing
+    /// neighbour means that direction points back at the control itself, so the cursor
+    /// stops rather than wandering.
     /// </summary>
-    private static void Chain(List<Control> row, List<Control> other, bool otherRowIsBelow)
+    private static void Chain(List<Control> row, List<Control>? above, List<Control>? below)
     {
         for (var i = 0; i < row.Count; i++)
         {
-            var across = row.Count == 1
-                ? 0
-                : (int)Math.Round(i * (other.Count - 1) / (double)(row.Count - 1));
-            var facing = other[Math.Clamp(across, 0, other.Count - 1)].GetPath();
-
             row[i].FocusNeighborLeft = (i > 0 ? row[i - 1] : row[i]).GetPath();
             row[i].FocusNeighborRight = (i < row.Count - 1 ? row[i + 1] : row[i]).GetPath();
-            row[i].FocusNeighborTop = otherRowIsBelow ? row[i].GetPath() : facing;
-            row[i].FocusNeighborBottom = otherRowIsBelow ? facing : row[i].GetPath();
+            row[i].FocusNeighborTop = Facing(row, i, above);
+            row[i].FocusNeighborBottom = Facing(row, i, below);
             // Tab and shift-tab would otherwise walk the whole tree, tables included.
             row[i].FocusNext = row[i].GetPath();
             row[i].FocusPrevious = row[i].GetPath();
         }
+    }
+
+    /// <summary>
+    /// The control in <paramref name="other" /> nearest the one at <paramref name="index" />,
+    /// so the cursor lands under where it left rather than jumping across the row.
+    /// </summary>
+    private static NodePath Facing(List<Control> row, int index, List<Control>? other)
+    {
+        if (other is null || other.Count == 0)
+            return row[index].GetPath();
+
+        var across = row.Count == 1
+            ? 0
+            : (int)Math.Round(index * (other.Count - 1) / (double)(row.Count - 1));
+        return other[Math.Clamp(across, 0, other.Count - 1)].GetPath();
     }
 
     /// <summary>
@@ -428,6 +489,10 @@ internal sealed class WinrateScreen : IDisposable
     private void Show(ReportTab tab)
     {
         WinrateSession.Tab = tab;
+        // The pick tabs carry a second filter row, so the header band and the focus chain
+        // both change shape with the tab.
+        LayOutForTab();
+        RelinkFocus();
         Rebuild();
     }
 
@@ -460,8 +525,11 @@ internal sealed class WinrateScreen : IDisposable
             var runs = WinrateSession.Filter.Apply(RunArchive.Runs);
             var report = WinrateReport.Build(runs);
             _summary.SetTextAutoSize(SummaryText(report));
+            // Which rarities exist depends on the runs in view, so the pick filter's own
+            // options are refreshed before they are read.
+            _pickFilters.Rebuild(report);
             replacement = NativeTable.BuildTab(
-                ReportTables.Build(WinrateSession.Tab, report),
+                ReportTables.Build(WinrateSession.Tab, report, WinrateSession.Picks),
                 EmptyMessage(),
                 ShowGraph);
         }
@@ -485,7 +553,14 @@ internal sealed class WinrateScreen : IDisposable
     {
         if (!RunArchive.HasLoaded)
             return "Reading run history…";
-        return RunArchive.FailureReason ?? "No runs match this filter.";
+        if (RunArchive.FailureReason is { } failure)
+            return failure;
+        // On the pick tabs the run filter is only half the story: the minimum and the
+        // rarity can empty the list on their own, and saying "no runs match" would send
+        // the player to the wrong control.
+        return WinrateSession.Tab is ReportTab.Cards or ReportTab.Relics
+            ? "Nothing picked matches these filters."
+            : "No runs match this filter.";
     }
 
     /// <summary>
@@ -521,14 +596,16 @@ internal sealed class WinrateScreen : IDisposable
         frame.OffsetRight = 760f;
         frame.OffsetTop = FilterRowTop;
         frame.OffsetBottom = FilterRowTop + FilterRowHeight;
+        _filterFrame = frame;
         frame.GrowHorizontal = Control.GrowDirection.Both;
         frame.GrowVertical = Control.GrowDirection.Both;
 
         // A band behind the filters in the same slate the stats panels use, so they read
-        // as a fixed header rather than as text floating over the table.
+        // as a fixed header rather than as text floating over the table. Opaque, because
+        // the tables scroll underneath it; see NativeStyle.HeaderBandColor.
         var backdrop = new ColorRect
         {
-            Color = NativeStyle.PanelColor,
+            Color = NativeStyle.HeaderBandColor,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
         backdrop.SetAnchorsPreset(Control.LayoutPreset.FullRect);
@@ -538,6 +615,7 @@ internal sealed class WinrateScreen : IDisposable
         row.AddThemeConstantOverride("separation", 8);
         row.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         row.AddChild(_filters.Root);
+        row.AddChild(_pickFilters.Root);
         row.AddChild(_summary);
         frame.AddChild(row);
         return frame;
@@ -599,18 +677,48 @@ internal sealed class WinrateScreen : IDisposable
 
         if (container.GetParent() is MarginContainer inset)
         {
+            _contentInset = inset;
             inset.AddThemeConstantOverride("margin_left", ContentMarginLeft);
             inset.AddThemeConstantOverride("margin_right", ContentMarginRight);
-            inset.AddThemeConstantOverride("margin_top", ContentMarginTop);
             inset.AddThemeConstantOverride("margin_bottom", ContentMarginBottom);
         }
 
         container.AddChild(_content);
     }
 
+    /// <summary>
+    /// Fit the screen around however many filter rows the open tab needs.
+    ///
+    /// The pick tabs show a second row, which makes the header band taller;
+    /// the table below it and the scrollbar beside it both have to start lower or the band
+    /// draws over them. Three numbers move together, so they are set in one place.
+    /// </summary>
+    private void LayOutForTab()
+    {
+        var showPicks = WinrateSession.Tab is ReportTab.Cards or ReportTab.Relics;
+        var extra = showPicks ? PickRowHeight : 0f;
+
+        _pickFilters.Root.Visible = showPicks;
+
+        if (_filterFrame.IsValid())
+            _filterFrame.OffsetBottom = FilterRowTop + FilterRowHeight + extra;
+
+        if (_contentInset is not null && _contentInset.IsValid())
+            _contentInset.AddThemeConstantOverride("margin_top", ContentMarginTop + (int)extra);
+
+        if (Scrollbar is { } scrollbar)
+        {
+            scrollbar.OffsetTop = FilterRowTop + FilterRowHeight + extra + ScrollbarGap;
+            scrollbar.CustomMinimumSize = new Vector2(
+                scrollbar.CustomMinimumSize.X,
+                Math.Max(0f, scrollbar.OffsetBottom - scrollbar.OffsetTop));
+        }
+    }
+
     public void Dispose()
     {
         _filters.Changed -= Rebuild;
+        _pickFilters.Changed -= Rebuild;
         if (_screen.IsValid())
         {
             StatsScreenPatch.Forget(_screen);
