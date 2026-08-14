@@ -1,9 +1,11 @@
 {
   "title": "Winrate Tracker",
   "description": "Winrate Tracker tracks your winrate over time!  Amazing!\n\nFeatures include:\n- Shows reports based on actual run history per-profile and per-ascension.\n- Calculates total winrate and splits (per-month, per-patch, per-10 game samples, per-50 game samples).\n- Per-character and time period filters.\n- Per-card and per-relic winrates.\n- Time of day splits (I'm better in the evening, which is odd!)\n- Charts and graphs!  They're not that exciting, really, but they exist.\n- Can optionally exclude floor 1 abandons.\n\nProject source on Github here:  https://github.com/davekalina/spire2-winrate-tracker",
-  "visibility": "public",
-  "changeNote": "Description updated.",
-  "tags": [],
+  "visibility": null,
+  "changeNote": "Tagged Utility.",
+  "tags": [
+    "Utility"
+  ],
   "dependencies": [],
   "contentDescriptors": []
 }
