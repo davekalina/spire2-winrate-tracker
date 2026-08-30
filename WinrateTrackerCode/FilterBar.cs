@@ -13,26 +13,37 @@ namespace WinrateTracker.WinrateTrackerCode;
 internal sealed class FilterBar
 {
     /// <summary>
-    /// Windows offered, in order. Null is the whole archive. Written short — <c>30d</c>, not
-    /// <c>Last 30 days</c> — because the box's own caption already says what the number
-    /// means, and a filter row that fits on one line is the point of the boxes.
+    /// Windows offered, in order. Null is the whole archive.
+    ///
+    /// These carry their own unit because the control has no caption: <c>30 days</c> reads
+    /// on its own where a bare <c>30</c> would not, and <c>All-Time</c> says what "no window"
+    /// means better than the word "All" beside a label saying "Window".
     ///
     /// A window the player types is still not here: it needs a number entry, which this row
     /// has no room for and the game has no native control for.
     /// </summary>
     private static readonly (string Text, int? Days)[] Windows =
     [
-        ("All", null),
-        ("7d", 7),
-        ("14d", 14),
-        ("30d", 30),
-        ("45d", 45),
-        ("60d", 60),
-        ("90d", 90),
-        ("120d", 120),
+        ("All-Time", null),
+        ("7 days", 7),
+        ("14 days", 14),
+        ("30 days", 30),
+        ("45 days", 45),
+        ("60 days", 60),
+        ("90 days", 90),
+        ("120 days", 120),
     ];
 
-    private const string AllText = "All";
+    /// <summary>
+    /// The ascension filter keeps its caption: on its own, "10" is a number with no subject.
+    /// The other two do not — "All Characters" and "30 days" say what they are.
+    /// </summary>
+    private const string AscensionCaption = "Ascension";
+
+    private const string NoCaption = "";
+
+    private const string AllAscensions = "All";
+    private const string AllCharacters = "All Characters";
 
     private readonly HBoxContainer _row;
     private readonly ComboBox _ascension;
@@ -54,9 +65,9 @@ internal sealed class FilterBar
         _row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Pass };
         _row.AddThemeConstantOverride("separation", Separation);
 
-        _ascension = Add(host, "Ascension");
-        _character = Add(host, "Character");
-        _window = Add(host, "Window");
+        _ascension = Add(host, AscensionCaption);
+        _character = Add(host, NoCaption);
+        _window = Add(host, NoCaption);
 
         _ascension.Changed += () => _ascensionChosen = true;
         foreach (var combo in Combos)
@@ -129,7 +140,7 @@ internal sealed class FilterBar
         _ascension.SetOptions(
             ascensions
                 .Select(ascension => new ComboBox.Option(Format.Count(ascension), ascension))
-                .Prepend(new ComboBox.Option(AllText, null)),
+                .Prepend(new ComboBox.Option(AllAscensions, null)),
             _ascensionChosen || !RunArchive.HasLoaded
                 ? filter.Ascension
                 : ascensions.Count > 0 ? ascensions[0] : null);
@@ -137,7 +148,7 @@ internal sealed class FilterBar
         _character.SetOptions(
             RunArchive.KnownCharacters()
                 .Select(character => new ComboBox.Option(character, character, ArtKey.Character(character)))
-                .Prepend(new ComboBox.Option(AllText, null)),
+                .Prepend(new ComboBox.Option(AllCharacters, null)),
             filter.Character);
 
         _window.SetOptions(

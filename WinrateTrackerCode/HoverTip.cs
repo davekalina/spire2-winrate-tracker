@@ -71,19 +71,36 @@ internal sealed class HoverTip
     /// content: these tips read as a set, and letting each size itself to its longest line
     /// makes four differently-shaped panels out of one widget.
     /// </summary>
-    public void Show(Control anchor, Control content, float width)
+    /// <param name="framed">
+    /// False for content that is already a finished picture — a card, which the game draws
+    /// with its own border and its own transparent margins. A frame round that reads as a
+    /// second border nobody asked for.
+    /// </param>
+    public void Show(Control anchor, Control content, float width, bool framed = true)
     {
         if (!GodotObject.IsInstanceValid(_panel) || !anchor.IsInsideTree() || !_host.IsInsideTree())
             return;
 
         Clear();
         content.MouseFilter = Control.MouseFilterEnum.Ignore;
-        content.CustomMinimumSize = new Vector2(TextWidth(width), 0);
+        // A width of nothing means the content knows its own size: a card scene does, a run
+        // of prose does not and has to be told before it can say how tall it is.
+        if (width > 0f)
+            content.CustomMinimumSize = new Vector2(TextWidth(width), 0);
+
+        _panel.AddThemeStyleboxOverride("panel", framed ? NativeStyle.PopupBox() : new StyleBoxEmpty());
+        var inset = framed ? PaddingX : 0;
+        _inset.AddThemeConstantOverride("margin_left", inset);
+        _inset.AddThemeConstantOverride("margin_right", inset);
+        _inset.AddThemeConstantOverride("margin_top", framed ? PaddingTop : 0);
+        _inset.AddThemeConstantOverride("margin_bottom", framed ? PaddingBottom : 0);
+
         _inset.AddChild(content);
         _content = content;
 
         _panel.Visible = true;
-        _panel.Size = new Vector2(width, _panel.GetCombinedMinimumSize().Y);
+        var minimum = _panel.GetCombinedMinimumSize();
+        _panel.Size = new Vector2(width > 0f ? width : minimum.X, minimum.Y);
         Place(anchor);
     }
 
@@ -135,10 +152,12 @@ internal sealed class HoverTip
     /// figures that are on screen now — the tables are rebuilt on every filter change, and
     /// a tip built at construction would outlive the row it described.
     /// </summary>
-    public void Attach(Control target, Func<Control> content, float width)
+    public void Attach(Control target, Func<Control> content, float width, bool framed = true)
     {
         target.MouseFilter = Control.MouseFilterEnum.Stop;
-        target.Connect(Control.SignalName.MouseEntered, Callable.From(() => Show(target, content(), width)));
+        target.Connect(
+            Control.SignalName.MouseEntered,
+            Callable.From(() => Show(target, content(), width, framed)));
         target.Connect(Control.SignalName.MouseExited, Callable.From(Hide));
         // A tip whose row is freed underneath it — which happens on every rebuild — would
         // otherwise be left on screen with nothing under the cursor to dismiss it.

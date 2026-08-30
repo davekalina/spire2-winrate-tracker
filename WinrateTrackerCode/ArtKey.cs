@@ -17,6 +17,24 @@ internal static class ArtKey
     public const string CharacterPrefix = "character/";
     public const string RarityPrefix = "rarity/";
 
+    /// <summary>
+    /// A row that can show the real thing behind it. Cards and relics are named on the pick
+    /// tabs and nowhere else on the screen, and a name is little help unless you already
+    /// remember what it does — so the row carries the id and the renderer asks the game to
+    /// draw it. See <see cref="GamePreview" />.
+    /// </summary>
+    public const string CardPreviewPrefix = "card/";
+
+    public const string RelicPreviewPrefix = "relic/";
+
+    /// <summary>The card behind a row on the Cards tab, by the id the run file recorded.</summary>
+    public static string? CardPreview(string? id) =>
+        string.IsNullOrWhiteSpace(id) ? null : CardPreviewPrefix + id;
+
+    /// <summary>The same for a relic.</summary>
+    public static string? RelicPreview(string? id) =>
+        string.IsNullOrWhiteSpace(id) ? null : RelicPreviewPrefix + id;
+
     /// <summary>The ascension flame, badged over a character icon in the run tip.</summary>
     public const string Ascension = "ascension";
 

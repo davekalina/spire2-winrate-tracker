@@ -392,8 +392,52 @@ public class ReportTablesTests
 
         var cards = Assert.Single(ReportTables.Build(ReportTab.Cards, WinrateReport.Build(runs)));
 
-        Assert.Null(cards.Rows[0][1].Icon);
+        Assert.Null(cards.Rows[0][0].Icon);
         Assert.False(cards.HasArt);
+    }
+
+    /// <summary>
+    /// The icon rides with the name, not with the rarity word. It is a picture of what the
+    /// row is about; beside the rarity it was labelling a label.
+    /// </summary>
+    [Fact]
+    public void A_pick_row_carries_its_icon_and_its_preview_on_the_name()
+    {
+        var runs = new List<RunRecord>
+        {
+            Run(Unix(2026, 1, 1), win: true, cards: ["SHIV"], relics: ["KUNAI"]),
+        };
+        GameData.RarityLookup = (table, id) => table == GameData.Cards ? "Rare" : "Shop";
+
+        try
+        {
+            var card = Assert.Single(ReportTables.Build(ReportTab.Cards, WinrateReport.Build(runs))).Rows[0];
+            Assert.Equal("rarity/cards/rare", card[0].Icon);
+            Assert.Equal("card/SHIV", card[0].Preview);
+            // The rarity column is words alone now.
+            Assert.Equal("Rare", card[1].Text);
+            Assert.Null(card[1].Icon);
+
+            var relic = Assert.Single(ReportTables.Build(ReportTab.Relics, WinrateReport.Build(runs))).Rows[0];
+            Assert.Equal("rarity/relics/shop", relic[0].Icon);
+            Assert.Equal("relic/KUNAI", relic[0].Preview);
+        }
+        finally
+        {
+            GameData.RarityLookup = null;
+        }
+    }
+
+    /// <summary>Only the pick tabs name a single thing, so only they carry previews.</summary>
+    [Fact]
+    public void No_other_tab_carries_a_preview()
+    {
+        var report = Report("WLLWLWLLLWLLWLLLWLLWLLLWWLWL");
+
+        foreach (var tab in AllTabs.Where(tab => tab is not (ReportTab.Cards or ReportTab.Relics)))
+        foreach (var section in Sections(tab, report))
+        foreach (var row in section.Rows)
+            Assert.All(row, cell => Assert.Null(cell.Preview));
     }
 
     [Fact]

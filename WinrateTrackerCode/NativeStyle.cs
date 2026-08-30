@@ -42,14 +42,24 @@ internal static class NativeStyle
     public const int CellFontSize = 25;
     public const int NoteFontSize = 20;
 
-    /// <summary>Panel captions — <c>LAST 50 RUNS</c> — on Home.</summary>
-    public const int CaptionFontSize = 21;
+    /// <summary>
+    /// Home's type, set one step down from the design's.
+    ///
+    /// The design was drawn against a 1420-wide content column. This screen's is 1250 — it
+    /// stops short of the scrollbar, which the mock-up had no need to allow for — and the
+    /// game's Kreon is wider than the browser's at the same nominal size. At the design's
+    /// figures the three Home rows do not fit, and a row that does not fit does not wrap or
+    /// clip: it makes the whole content column grow, which is what had the panels sliding
+    /// about as the numbers under them changed width. Scaled down together, so the
+    /// proportions between them are the design's even though the sizes are not.
+    /// </summary>
+    public const int CaptionFontSize = 18;
 
     /// <summary>The rate on the Home headline. The one figure the screen exists to show.</summary>
-    public const int HeroFontSize = 118;
+    public const int HeroFontSize = 100;
 
     /// <summary>A stat box's figure.</summary>
-    public const int StatFontSize = 44;
+    public const int StatFontSize = 36;
 
     /// <summary>A row of text. Rows carrying art need <see cref="ArtRowHeight" /> instead.</summary>
     public const int RowHeight = 33;

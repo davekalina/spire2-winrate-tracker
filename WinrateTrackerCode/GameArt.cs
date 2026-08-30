@@ -22,9 +22,15 @@ internal static class GameArt
     /// <see cref="ImageHelper.GetImagePath" /> means: the part after <c>res://images/</c>.
     ///
     /// The two rarity vocabularies are listed separately even where they agree, because
-    /// they only mostly agree: a card's <c>Event</c> is drawn with the special-card icon,
-    /// while a relic's <c>Event</c> — a different thing that happens to share the word —
-    /// has no art of its own and must not borrow it.
+    /// they only mostly agree. A card's <c>Event</c> is the reward screen's special-card
+    /// icon; a relic's <c>Event</c> is a different thing that happens to share the word, and
+    /// takes the run-history screen's event marker instead.
+    ///
+    /// The rarities with no reward-screen icon of their own borrow from the two other
+    /// families of icon the game draws at this size and weight: the run-history room
+    /// markers, which is where <c>Shop</c>, <c>Event</c> and <c>Ancient</c> come from, and
+    /// the statistics screen's, which is where the clock comes from. Nothing here is drawn
+    /// by this mod.
     /// </summary>
     private static readonly Dictionary<string, string> Paths = new(StringComparer.Ordinal)
     {
@@ -41,11 +47,16 @@ internal static class GameArt
         ["rarity/cards/uncommon"] = "ui/reward_screen/reward_icon_uncommon.png",
         ["rarity/cards/rare"] = "ui/reward_screen/reward_icon_rare.png",
         ["rarity/cards/event"] = "ui/reward_screen/reward_icon_special_card.png",
+        ["rarity/cards/ancient"] = "ui/run_history/ancient.png",
+        ["rarity/cards/curse"] = "packed/modifiers/cursed_run.png",
+        ["rarity/cards/quest"] = "packed/statistics_screen/stats_questionmark.png",
 
         ["rarity/relics/common"] = "ui/reward_screen/reward_icon_card.png",
         ["rarity/relics/uncommon"] = "ui/reward_screen/reward_icon_uncommon.png",
         ["rarity/relics/rare"] = "ui/reward_screen/reward_icon_rare.png",
         ["rarity/relics/shop"] = "ui/run_history/shop.png",
+        ["rarity/relics/event"] = "ui/run_history/event.png",
+        ["rarity/relics/ancient"] = "ui/run_history/ancient.png",
     };
 
     private static readonly Dictionary<string, Texture2D> Loaded = new(StringComparer.Ordinal);

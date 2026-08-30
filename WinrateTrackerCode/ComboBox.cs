@@ -67,6 +67,11 @@ internal sealed class ComboBox
     /// <paramref name="host" /> is what the drop-down list is parented to — the screen, not
     /// the filter row. A list parented to the row would be clipped by it and drawn under the
     /// tables; parented to the screen it hangs over everything, which is what a list is for.
+    ///
+    /// <paramref name="caption" /> may be empty, and should be wherever the values say what
+    /// they are on their own: "All Characters" and "Ironclad" need no word "Character" in
+    /// front of them, and the row has better uses for the width. A caption earns its place
+    /// only where the value alone is ambiguous — "10" needs "Ascension".
     /// </summary>
     public ComboBox(Control host, string caption)
     {
@@ -85,9 +90,12 @@ internal sealed class ComboBox
         var row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
         row.AddThemeConstantOverride("separation", Separation);
 
-        var captionLabel = NativeStyle.Figure(caption, CaptionFontSize, NativeStyle.ColumnHeaderColor);
-        captionLabel.VerticalAlignment = VerticalAlignment.Center;
-        row.AddChild(captionLabel);
+        if (caption.Length > 0)
+        {
+            var captionLabel = NativeStyle.Figure(caption, CaptionFontSize, NativeStyle.ColumnHeaderColor);
+            captionLabel.VerticalAlignment = VerticalAlignment.Center;
+            row.AddChild(captionLabel);
+        }
 
         _iconSlot = new Control
         {

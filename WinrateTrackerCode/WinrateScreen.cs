@@ -205,12 +205,6 @@ internal sealed class WinrateScreen : IDisposable
                 Callable.From<NClickableControl>(_ => Show(tab)));
         }
 
-        _tip.Attach(
-            _summary,
-            () => HoverTip.Column(HoverTip.Paragraph(
-                CoopNote, NativeStyle.CellColor, HoverTip.TextWidth(SummaryTipWidth))),
-            SummaryTipWidth);
-
         ReplaceNativeContent();
         RaiseContentFade();
         LowerScrollbar();
@@ -693,25 +687,21 @@ internal sealed class WinrateScreen : IDisposable
     /// <summary>
     /// What the archive in view amounts to, on the right-hand end of the filter row.
     ///
-    /// The co-op rule moved into this line's hover tip — it is a standing fact, not news,
-    /// and it was taking a row of the screen to repeat on every visit. An unreadable file
-    /// stays in the line itself: that is news, and a run silently missing from a win rate is
-    /// worse than a win rate that admits what it left out.
+    /// The same three figures on every tab, pick tabs included. They were shortened there
+    /// while the row was carrying a second row's worth of filters; it is not, and dropping
+    /// the record bought width nothing needed.
     ///
-    /// On the pick tabs the record is dropped and only the rate kept. The row is carrying
-    /// five filters there and the record is the least of the three figures.
+    /// An unreadable file is appended when there is one. That is news, and a run silently
+    /// missing from a win rate is worse than a win rate that admits what it left out.
     /// </summary>
     private static string SummaryText(WinrateReport report)
     {
         if (!RunArchive.HasLoaded)
             return "Reading run history…";
 
-        var runs = $"{report.Overall.Runs} runs";
         var parts = new List<string>
         {
-            WinrateSession.Tab is ReportTab.Cards or ReportTab.Relics
-                ? $"{runs} · {Format.Percent(report.Overall)}"
-                : $"{runs} · {Format.WinLoss(report.Overall)} · {Format.Percent(report.Overall)}",
+            $"{report.Overall.Runs} runs · {Format.WinLoss(report.Overall)} · {Format.Percent(report.Overall)}",
         };
         if (RunArchive.UnreadableFiles > 0)
             parts.Add($"{RunArchive.UnreadableFiles} file(s) could not be read");
@@ -720,15 +710,17 @@ internal sealed class WinrateScreen : IDisposable
 
     private Control BuildFilterRow()
     {
-        // Anchored to the screen's centre, like the tab row above it, so the filters stay
-        // put at any resolution.
+        // The band spans exactly the column the tables below it occupy, by taking the same
+        // insets from the same edges. Centring it on the screen instead — which it used to
+        // do — made it wider than the tables on one side and narrower on the other, because
+        // the content column is deliberately asymmetric: it stops short of the scrollbar.
         var frame = new Control { MouseFilter = Control.MouseFilterEnum.Pass };
-        frame.AnchorLeft = 0.5f;
-        frame.AnchorRight = 0.5f;
+        frame.AnchorLeft = 0f;
+        frame.AnchorRight = 1f;
         frame.AnchorTop = 0.5f;
         frame.AnchorBottom = 0.5f;
-        frame.OffsetLeft = -760f;
-        frame.OffsetRight = 760f;
+        frame.OffsetLeft = ContentMarginLeft;
+        frame.OffsetRight = -ContentMarginRight;
         frame.OffsetTop = FilterRowTop;
         frame.OffsetBottom = FilterRowTop + FilterRowHeight;
         frame.GrowHorizontal = Control.GrowDirection.Both;
@@ -775,16 +767,6 @@ internal sealed class WinrateScreen : IDisposable
     private const int FilterPaddingX = 22;
     private const int FilterPaddingTop = 12;
     private const int FilterPaddingBottom = 14;
-
-    /// <summary>
-    /// Why the numbers on the right are what they are. It was a line of text under the
-    /// filters; as a tip it costs no height and says the same thing to anyone who wonders.
-    /// </summary>
-    private const string CoopNote =
-        "Solo runs only — co-op runs are left out. A shared win is not the same evidence "
-        + "about your play as a solo one.";
-
-    private const float SummaryTipWidth = 470f;
 
     /// <summary>
     /// Raise the point at which scrolled content dissolves, so it disappears above the

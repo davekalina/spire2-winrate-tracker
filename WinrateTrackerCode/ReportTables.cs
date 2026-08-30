@@ -70,6 +70,13 @@ internal sealed record TableCell(IReadOnlyList<string> Parts)
     /// <summary>Ten runs as wins and losses, oldest first, drawn as pips instead of text.</summary>
     public IReadOnlyList<bool>? Pips { get; init; }
 
+    /// <summary>
+    /// The real thing this row is about — a card or a relic — for the renderer to have the
+    /// game draw on hover. An <see cref="ArtKey" /> preview key, or null for a row that is
+    /// only ever text.
+    /// </summary>
+    public string? Preview { get; init; }
+
     /// <summary>The whole cell as one string. For tests and diagnostics.</summary>
     public string Text => string.Join(' ', Parts);
 }
@@ -365,7 +372,8 @@ internal static class ReportTables
             cards ? filter.ApplyToCards(report.Cards) : filter.ApplyToRelics(report.Relics),
             cards ? GameData.CardName : GameData.RelicName,
             cards ? GameData.Cards : GameData.Relics,
-            report.Overall.WinRate);
+            report.Overall.WinRate,
+            cards);
 
         // Runs from before the mod could read decks, a run filter that leaves only such
         // runs, or a minimum that nothing clears: all of them can empty the list, and the
@@ -378,7 +386,8 @@ internal static class ReportTables
         IReadOnlyList<PickRow> picks,
         Func<string, string> nameOf,
         string table,
-        double allTimeRate) =>
+        double allTimeRate,
+        bool cards) =>
         new(
             "",
             [
@@ -391,8 +400,17 @@ internal static class ReportTables
             ],
             picks.Select(pick => (IReadOnlyList<TableCell>)
             [
-                nameOf(pick.Id),
-                new TableCell([pick.Rarity]) { Icon = ArtKey.Rarity(table, pick.Rarity) },
+                // The icon rides with the name, not with the rarity word beside it. It is a
+                // picture of what the row is about, and the row is about a card — the rarity
+                // column already says the rarity in words, and an icon there was labelling a
+                // label. The rarity list in the filter still carries it, where it is the only
+                // thing distinguishing one option from another at a glance.
+                new TableCell([nameOf(pick.Id)])
+                {
+                    Icon = ArtKey.Rarity(table, pick.Rarity),
+                    Preview = cards ? ArtKey.CardPreview(pick.Id) : ArtKey.RelicPreview(pick.Id),
+                },
+                pick.Rarity,
                 Format.Count(pick.Tally.Runs),
                 Format.WinLoss(pick.Tally),
                 Format.Percent(pick.Tally),

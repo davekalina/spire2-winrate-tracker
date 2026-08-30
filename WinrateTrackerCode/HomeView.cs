@@ -37,7 +37,7 @@ internal sealed class HomeView
 
     private const float TrendRatio = 780f;
 
-    private const float PlotHeight = 196f;
+    private const float PlotHeight = 186f;
 
     /// <summary>Room to the right of the plot for the shared percentage axis.</summary>
     private const float AxisGutter = 58f;
@@ -47,29 +47,29 @@ internal sealed class HomeView
     private const float BarCapHeight = 3f;
 
     /// <summary>A run pip on the headline. Big enough to carry its letter and be hovered.</summary>
-    private const float RunPipSize = 30f;
+    private const float RunPipSize = 26f;
 
-    private const int RunPipGap = 7;
-    private const float ChipIconSize = 42f;
+    private const int RunPipGap = 5;
+    private const float ChipIconSize = 36f;
 
     /// <summary>Five chips share the row, so their padding is the row's tightest constraint.</summary>
-    private const int ChipPaddingX = 14;
-    private const float ChipPipHeight = 10f;
+    private const int ChipPaddingX = 12;
+    private const float ChipPipHeight = 9f;
     private const int ChipPipGap = 4;
 
     private const float RunTipWidth = 440f;
     private const float BarTipWidth = 300f;
     private const float TrendTipWidth = 470f;
 
-    private const int NameFontSize = 24;
-    private const int ChipRecordFontSize = 38;
-    private const int ChipFiftyFontSize = 22;
-    private const int DeltaFontSize = 29;
-    private const int BaselineFontSize = 21;
-    private const int LegendFontSize = 20;
-    private const int AxisFontSize = 19;
-    private const int DetailFontSize = 22;
-    private const int SmallFontSize = 19;
+    private const int NameFontSize = 21;
+    private const int ChipRecordFontSize = 32;
+    private const int ChipFiftyFontSize = 19;
+    private const int DeltaFontSize = 25;
+    private const int BaselineFontSize = 18;
+    private const int LegendFontSize = 18;
+    private const int AxisFontSize = 17;
+    private const int DetailFontSize = 19;
+    private const int SmallFontSize = 17;
 
     private readonly HoverTip _tip;
     private readonly Action<string?> _onCharacter;
@@ -185,7 +185,7 @@ internal sealed class HomeView
         if (panel.RecentRuns.Count > 0)
             column.AddChild(RunStrip(panel.RecentRuns));
 
-        return NativeStyle.Panel(column, 28, 20, 28, 24);
+        return NativeStyle.Panel(column, 22, 18, 22, 20);
     }
 
     /// <summary>
@@ -300,7 +300,7 @@ internal sealed class HomeView
         column.AddChild(Plot(trend));
         column.AddChild(AxisLabels(trend));
 
-        return NativeStyle.Panel(column, 28, 20, 28, 16);
+        return NativeStyle.Panel(column, 22, 18, 22, 14);
     }
 
     /// <summary>
@@ -687,7 +687,7 @@ internal sealed class HomeView
         column.AddChild(NativeStyle.Caption(stat.Caption));
 
         var line = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-        line.AddThemeConstantOverride("separation", 12);
+        line.AddThemeConstantOverride("separation", 10);
         line.AddChild(NativeStyle.Figure(stat.Value, NativeStyle.StatFontSize, NativeStyle.ToneColor(stat.ValueTone)));
         if (stat.Detail.Length > 0)
             line.AddChild(NativeStyle.Figure(
@@ -697,6 +697,6 @@ internal sealed class HomeView
             line.AddChild(NativeStyle.Figure(stat.Delta, DetailFontSize, NativeStyle.ToneColor(stat.DeltaTone)));
         column.AddChild(line);
 
-        return NativeStyle.Panel(column, 22, 14, 22, 16);
+        return NativeStyle.Panel(column, 16, 12, 16, 14);
     }
 }

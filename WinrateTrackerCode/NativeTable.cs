@@ -42,6 +42,9 @@ internal static class NativeTable
     /// <summary>How wide a column-heading tip is drawn.</summary>
     private const float HeadingTipWidth = 470f;
 
+    /// <summary>A card sizes its own preview; a relic's is assembled and needs a width.</summary>
+    private const float CardPreviewWidth = 0f;
+
     /// <summary>
     /// Title (with a Show Graph button where there is something to plot) over the
     /// panelled table.
@@ -94,7 +97,7 @@ internal static class NativeTable
 
         for (var i = 0; i < section.Rows.Count; i++)
             body.AddChild(BuildRow(
-                section, section.Rows[i], widths, partWidths, rowHeight, iconSize, striped: i % 2 == 0));
+                section, section.Rows[i], widths, partWidths, rowHeight, iconSize, tip, striped: i % 2 == 0));
 
         return body;
     }
@@ -166,6 +169,7 @@ internal static class NativeTable
         float[][] partWidths,
         int rowHeight,
         float iconSize,
+        HoverTip? tip,
         bool striped)
     {
         var panel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
@@ -195,7 +199,37 @@ internal static class NativeTable
         }
 
         panel.AddChild(row);
+        AttachPreview(panel, cells, tip);
         return panel;
+    }
+
+    /// <summary>
+    /// Let the whole row show the card or relic it is about.
+    ///
+    /// The row rather than the name alone: the row is what the eye is tracking across to
+    /// read the numbers, and having the picture appear only over the first column would
+    /// mean losing it exactly when you look at the figure you came for.
+    ///
+    /// Only rows that have something to show listen at all. A card the model database has
+    /// never heard of — a mod's card in an old run file, say — leaves the row inert rather
+    /// than opening an empty frame under the cursor.
+    /// </summary>
+    private static void AttachPreview(Control row, IReadOnlyList<TableCell> cells, HoverTip? tip)
+    {
+        if (tip is null)
+            return;
+
+        var key = cells.Select(cell => cell.Preview).FirstOrDefault(preview => preview is not null);
+        if (key is null || !GamePreview.Exists(key))
+            return;
+
+        var cards = key.StartsWith(ArtKey.CardPreviewPrefix, StringComparison.Ordinal);
+        tip.Attach(
+            row,
+            () => GamePreview.Of(key) ?? new Control(),
+            cards ? CardPreviewWidth : GamePreview.RelicWidth,
+            // The card arrives already framed, in the game's own border.
+            framed: !cards);
     }
 
     private static Control BuildCell(TableCell cell, TableColumn column, float[] partWidths, float iconSize)
