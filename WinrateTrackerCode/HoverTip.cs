@@ -39,6 +39,17 @@ internal sealed class HoverTip
     private readonly MarginContainer _inset;
     private Control? _content;
 
+    /// <summary>
+    /// Whether the tip that is up tracks the cursor across its target.
+    ///
+    /// Set per tip rather than always. A tip pinned under a small target is steadier to
+    /// read and always in the same place relative to the thing it explains — right for a
+    /// column heading or a run pip, which are barely wider than the cursor. A card is 300 px
+    /// of picture hanging off a name that can be half the table wide, and pinning it to the
+    /// left edge of that name puts it nowhere near where you are pointing.
+    /// </summary>
+    private bool _follow;
+
     public HoverTip(Control host)
     {
         _host = host;
@@ -76,8 +87,9 @@ internal sealed class HoverTip
     /// with its own border and its own transparent margins. A frame round that reads as a
     /// second border nobody asked for.
     /// </param>
-    public void Show(Control anchor, Control content, float width, bool framed = true)
+    public void Show(Control anchor, Control content, float width, bool framed = true, bool follow = false)
     {
+        _follow = follow;
         if (!GodotObject.IsInstanceValid(_panel) || !anchor.IsInsideTree() || !_host.IsInsideTree())
             return;
 
@@ -133,7 +145,13 @@ internal sealed class HoverTip
         var hostRect = _host.GetGlobalRect();
         var size = _panel.Size;
 
-        var left = anchorRect.Position.X - hostRect.Position.X;
+        // Centred on the cursor when following, so a wide picture sits under where you are
+        // actually pointing rather than off at one end of the row.
+        var left = _follow
+            ? _host.GetLocalMousePosition().X - (size.X / 2f)
+            : anchorRect.Position.X - hostRect.Position.X;
+        // Vertically it stays below the row either way. Under the cursor it would sit on
+        // top of the thing it is describing, and the cursor would be inside the tip.
         var top = anchorRect.Position.Y - hostRect.Position.Y + anchorRect.Size.Y + Gap;
 
         _panel.Position = new Vector2(
@@ -168,12 +186,24 @@ internal sealed class HoverTip
     /// figures that are on screen now — the tables are rebuilt on every filter change, and
     /// a tip built at construction would outlive the row it described.
     /// </summary>
-    public void Attach(Control target, Func<Control> content, float width, bool framed = true)
+    public void Attach(
+        Control target,
+        Func<Control> content,
+        float width,
+        bool framed = true,
+        bool follow = false)
     {
         target.MouseFilter = Control.MouseFilterEnum.Stop;
         target.Connect(
             Control.SignalName.MouseEntered,
-            Callable.From(() => Show(target, content(), width, framed)));
+            Callable.From(() => Show(target, content(), width, framed, follow)));
+
+        if (follow)
+            target.Connect(Control.SignalName.GuiInput, Callable.From<InputEvent>(input =>
+            {
+                if (input is InputEventMouseMotion && GodotObject.IsInstanceValid(_panel) && _panel.Visible)
+                    Place(target);
+            }));
         target.Connect(Control.SignalName.MouseExited, Callable.From(Hide));
         // A tip whose row is freed underneath it — which happens on every rebuild — would
         // otherwise be left on screen with nothing under the cursor to dismiss it.

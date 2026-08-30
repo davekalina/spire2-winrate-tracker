@@ -235,7 +235,9 @@ internal static class NativeTable
             () => GamePreview.Of(key) ?? new Control(),
             cards ? CardPreviewWidth : GamePreview.RelicWidth,
             // The card arrives already framed, in the game's own border.
-            framed: !cards);
+            framed: !cards,
+            // A name can be half the table wide, so the picture goes where the cursor is.
+            follow: true);
     }
 
     private static Control BuildCell(TableCell cell, TableColumn column, float[] partWidths, float iconSize)
