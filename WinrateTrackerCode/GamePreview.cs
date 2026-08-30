@@ -120,12 +120,7 @@ internal static class GamePreview
             return null;
         }
 
-        // A mutable instance, never the canonical template. The database hands out
-        // immutable models, and a card node given one draws the game's own "Broken Card —
-        // if you can read this, there is a bug" placeholder rather than the card. This is
-        // the same conversion the game's own CardHoverTip does for the same reason.
-        var instance = model.IsMutable ? model : model.ToMutable();
-        card.Ready += () => card.Model = instance;
+        Populate(card, () => card.Model = Mutable(model));
         tip.MouseFilter = Control.MouseFilterEnum.Ignore;
         return tip;
     }
@@ -147,8 +142,7 @@ internal static class GamePreview
         relic.CustomMinimumSize = new Vector2(RelicIconSize, RelicIconSize);
         relic.MouseFilter = Control.MouseFilterEnum.Ignore;
         relic.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        var instance = model.IsMutable ? model : model.ToMutable();
-        relic.Ready += () => relic.Model = instance;
+        Populate(relic, () => relic.Model = Mutable(model));
 
         column.AddChild(HoverTip.Row(
             14,
@@ -159,10 +153,58 @@ internal static class GamePreview
         // the game has not finished it is a red "details will be revealed in the future"
         // placeholder that reads as a fault in this screen rather than in the relic.
         if (Text(model.DynamicDescription) is { } description)
-            column.AddChild(HoverTip.Paragraph(
+            column.AddChild(HoverTip.RichParagraph(
                 description, NativeStyle.CellColor, HoverTip.TextWidth(RelicWidth), RelicBodyFontSize));
 
         return column;
+    }
+
+    /// <summary>
+    /// A mutable instance, never the canonical template. The database hands out immutable
+    /// models, and the game's own hover tip converts before it draws; so does this.
+    /// </summary>
+    private static T Mutable<T>(T model) where T : AbstractModel =>
+        model.IsMutable ? model : (T)(object)Clone(model);
+
+    private static object Clone(AbstractModel model) => model switch
+    {
+        CardModel card => card.ToMutable(),
+        RelicModel relic => relic.ToMutable(),
+        _ => model,
+    };
+
+    /// <summary>
+    /// Give a freshly instantiated node its model, a frame after it is ready.
+    ///
+    /// The frame matters. <c>NCard.Reload</c> — which is what actually draws the card —
+    /// opens with <c>if (!IsNodeReady() || Model == null) return;</c>, so a model assigned
+    /// while the node is still becoming ready is stored and never drawn, and the card sits
+    /// there showing the placeholder its scene ships with: "Broken Card — if you can read
+    /// this, there is a bug." Deferring past the ready notification puts the assignment
+    /// somewhere both halves of that guard are satisfied.
+    ///
+    /// The game itself never hits this because it pulls cards from a pool, where every node
+    /// was made ready long ago.
+    /// </summary>
+    private static void Populate(Node node, Action assign)
+    {
+        void Apply()
+        {
+            try
+            {
+                if (GodotObject.IsInstanceValid(node))
+                    assign();
+            }
+            catch (Exception exception)
+            {
+                MainFile.Logger.Warn($"Could not populate a preview: {exception}");
+            }
+        }
+
+        if (node.IsNodeReady())
+            Apply();
+        else
+            node.Ready += () => Callable.From(Apply).CallDeferred();
     }
 
     /// <summary>
@@ -182,9 +224,6 @@ internal static class GamePreview
         try
         {
             var text = line?.GetFormattedText();
-            if (string.IsNullOrWhiteSpace(text))
-                return null;
-            text = Markup.Replace(text, string.Empty).Trim();
             return string.IsNullOrWhiteSpace(text) ? null : text;
         }
         catch
@@ -193,10 +232,21 @@ internal static class GamePreview
         }
     }
 
-    /// <summary>
-    /// A BBCode tag: <c>[blue]</c>, <c>[/blue]</c>, <c>[img=32]</c>. Deliberately not a
-    /// general HTML-ish matcher — it must not eat a square bracket a relic's own text uses.
-    /// </summary>
-    private static readonly System.Text.RegularExpressions.Regex Markup =
-        new(@"\[/?[a-zA-Z][^\[\]]*\]", System.Text.RegularExpressions.RegexOptions.Compiled);
+    /// <summary>The relic's own icon, for the table as well as the tip.</summary>
+    public static Texture2D? RelicIcon(string? key)
+    {
+        if (key is null || !key.StartsWith(ArtKey.RelicPreviewPrefix, StringComparison.Ordinal))
+            return null;
+        try
+        {
+            return RelicModels().TryGetValue(key[ArtKey.RelicPreviewPrefix.Length..], out var model)
+                ? model.Icon
+                : null;
+        }
+        catch (Exception exception)
+        {
+            MainFile.Logger.Warn($"Could not load the icon for '{key}': {exception.Message}");
+            return null;
+        }
+    }
 }

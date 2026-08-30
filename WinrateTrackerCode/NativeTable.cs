@@ -25,6 +25,12 @@ internal static class NativeTable
     /// <summary>A rarity icon, which has to fit a row of plain text.</summary>
     private const float TextRowIconSize = 28f;
 
+    /// <summary>
+    /// A relic's own art, drawn at about half the size the game draws it at. Big enough to
+    /// recognise a relic by shape and colour without turning the table into a gallery.
+    /// </summary>
+    private const float RelicArtSize = 32f;
+
     /// <summary>The same in a column heading, where it sits beside smaller text.</summary>
     private const float HeaderIconSize = 34f;
 
@@ -84,8 +90,14 @@ internal static class NativeTable
     {
         var widths = MeasureColumns(section);
         var partWidths = MeasurePartWidths(section);
-        var rowHeight = section.HasPips ? NativeStyle.ArtRowHeight : NativeStyle.RowHeight;
-        var iconSize = section.HasPips ? TallRowIconSize : TextRowIconSize;
+        // Relic art needs the taller row as much as a pip strip does. Asked of the rows
+        // rather than of the section, because it is a fact about the renderer's choice to
+        // draw that art, not about what the table says.
+        var art = section.Rows.Any(row => row.Any(
+            cell => cell.Preview?.StartsWith(ArtKey.RelicPreviewPrefix, StringComparison.Ordinal) == true));
+        var tall = section.HasPips || art;
+        var rowHeight = tall ? NativeStyle.ArtRowHeight : NativeStyle.RowHeight;
+        var iconSize = tall && section.HasPips ? TallRowIconSize : TextRowIconSize;
 
         var body = new VBoxContainer();
         body.AddThemeConstantOverride("separation", 0);
@@ -243,9 +255,46 @@ internal static class NativeTable
 
         // The slot is reserved whether or not the game has art to put in it: a rarity with
         // no icon would otherwise pull its label left out of the column the others share.
-        return cell.Icon is null
-            ? label
-            : Beside(GameArt.IconSlot(cell.Icon, iconSize), label, column.RightAligned);
+        if (cell.Icon is null && cell.Preview is null)
+            return label;
+
+        var row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        row.AddThemeConstantOverride("separation", IconGap);
+        if (column.RightAligned)
+        {
+            row.Alignment = BoxContainer.AlignmentMode.End;
+            label.SizeFlagsHorizontal = Control.SizeFlags.Fill;
+        }
+
+        // The relic's own art leads, then its rarity, then its name — the thing itself, what
+        // kind of thing it is, and what it is called.
+        if (RelicArt(cell.Preview) is { } art)
+            row.AddChild(art);
+        if (cell.Icon is not null)
+            row.AddChild(GameArt.IconSlot(cell.Icon, iconSize));
+        row.AddChild(label);
+        return row;
+    }
+
+    /// <summary>
+    /// A relic's own icon, if this cell is about a relic. Cards have one too, but a card's
+    /// art is its portrait and unrecognisable at this size — the rarity icon does more work
+    /// there, and the picture is a hover away.
+    /// </summary>
+    private static Control? RelicArt(string? preview)
+    {
+        if (GamePreview.RelicIcon(preview) is not { } texture)
+            return null;
+
+        return new TextureRect
+        {
+            Texture = texture,
+            CustomMinimumSize = new Vector2(RelicArtSize, RelicArtSize),
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+        };
     }
 
     /// <summary>
@@ -353,6 +402,8 @@ internal static class NativeTable
         }
         if (cell.Icon is not null)
             width += iconSize + IconGap;
+        if (cell.Preview?.StartsWith(ArtKey.RelicPreviewPrefix, StringComparison.Ordinal) == true)
+            width += RelicArtSize + IconGap;
         return width;
     }
 

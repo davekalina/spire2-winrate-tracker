@@ -97,8 +97,24 @@ internal sealed class HoverTip
 
         _inset.AddChild(content);
         _content = content;
-
         _panel.Visible = true;
+        Fit(anchor, width);
+
+        // Rich text does not know how tall it is until it has been laid out at a real
+        // width, and says so afterwards by re-announcing its minimum size. Without this the
+        // panel keeps whatever height it guessed on the frame it opened, which for a relic
+        // description is usually one line too few.
+        content.Connect(
+            Control.SignalName.MinimumSizeChanged,
+            Callable.From(() =>
+            {
+                if (GodotObject.IsInstanceValid(_panel) && _panel.Visible && anchor.IsInsideTree())
+                    Fit(anchor, width);
+            }));
+    }
+
+    private void Fit(Control anchor, float width)
+    {
         var minimum = _panel.GetCombinedMinimumSize();
         _panel.Size = new Vector2(width > 0f ? width : minimum.X, minimum.Y);
         Place(anchor);
@@ -187,6 +203,34 @@ internal sealed class HoverTip
     }
 
     private const int LineFontSize = 22;
+
+    /// <summary>
+    /// A run of the game's own marked-up text — keyword colours, inline energy icons —
+    /// rendered by the game's own rich-text label.
+    ///
+    /// <see cref="Paragraph" /> cannot be used for these. It measures and breaks the text
+    /// itself, which needs plain words; the game's descriptions arrive full of BBCode and
+    /// image paths that only a rich-text label knows what to do with, and stripping them
+    /// left "gain res://images/.../energy_icon.png" on screen. The height this costs is
+    /// recovered by the re-fit in <see cref="Show" />.
+    /// </summary>
+    public static MegaRichTextLabel RichParagraph(string text, Color color, float width, int size = LineFontSize)
+    {
+        var label = new MegaRichTextLabel
+        {
+            AutoSizeEnabled = false,
+            BbcodeEnabled = true,
+            FitContent = true,
+            ScrollActive = false,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+            CustomMinimumSize = new Vector2(width, 0),
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        label.AddThemeFontSizeOverride("normal_font_size", size);
+        label.AddThemeColorOverride("default_color", color);
+        label.Text = text;
+        return label;
+    }
 
     /// <summary>The room a tip of this width leaves for text, inside its frame.</summary>
     public static float TextWidth(float width) => width - (PaddingX * 2);

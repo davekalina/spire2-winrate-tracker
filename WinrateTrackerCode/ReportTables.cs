@@ -166,9 +166,8 @@ internal static class ReportTables
             Bar = new BarSpec(rate, ComparisonScale),
             MinWidth = width,
             Tooltip =
-                $"Bars run from zero on a 0–{Format.WholePercent(ComparisonScale)} scale, "
-                + $"with the notch at your own rate {scope}: {Format.Percent(rate)}. "
-                + "Longer than the notch means that period beat your average.",
+                $"Each bar is that period's win rate, on a 0–{Format.WholePercent(ComparisonScale)} scale. "
+                + $"The notch is your own rate {scope}: {Format.Percent(rate)}.",
         };
 
     /// <summary>
@@ -435,7 +434,7 @@ internal static class ReportTables
             Bar = new BarSpec(rate, 1.0d, Signed: true),
             MinWidth = PickBarWidth,
             Tooltip =
-                $"Bars run from your own rate {scope} — {Format.Percent(rate)} — right when a pick "
-                + "beat it, left when it did not. A near-average pick draws almost nothing.",
+                $"Each bar is the gap between a pick's win rate and your own rate {scope}, "
+                + $"{Format.Percent(rate)}. Right if the pick beat it, left if it did not.",
         };
 }
