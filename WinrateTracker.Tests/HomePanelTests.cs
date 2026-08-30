@@ -206,13 +206,15 @@ public class HomePanelTests
         var report = WinrateReport.Build(runs);
         var stats = HomePanel.Build(report, report.Characters, null).Stats;
 
+        // Months use their short form here: four boxes share one row, and "Feb 2026"
+        // three times over is most of a box spent on the year.
         Assert.Equal(
-            ["This month · Feb 2026", "This patch · v0.109", "Streak", "Avg floors · Feb 2026"],
+            ["This month · Feb", "This patch · v0.109", "Streak", "Avg floors · Feb"],
             stats.Select(stat => stat.Caption));
 
         Assert.Equal("100%", stats[0].Value);
         Assert.Equal("2-0", stats[0].Detail);
-        Assert.Equal("▲ 100 vs Jan 2026", stats[0].Delta);
+        Assert.Equal("▲ 100 vs Jan", stats[0].Delta);
         Assert.Equal(Tone.Good, stats[0].DeltaTone);
 
         Assert.Equal("2 wins", stats[2].Value);
@@ -224,7 +226,7 @@ public class HomePanelTests
         Assert.Equal("45.0", stats[3].Value);
         Assert.Equal(Tone.Measured, stats[3].ValueTone);
         Assert.Equal("reached", stats[3].Detail);
-        Assert.Equal("▲ 20.0 vs Jan 2026", stats[3].Delta);
+        Assert.Equal("▲ 20.0 vs Jan", stats[3].Delta);
     }
 
     [Fact]

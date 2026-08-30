@@ -78,7 +78,7 @@ internal sealed class HoverTip
 
         Clear();
         content.MouseFilter = Control.MouseFilterEnum.Ignore;
-        content.CustomMinimumSize = new Vector2(width - (PaddingX * 2), 0);
+        content.CustomMinimumSize = new Vector2(TextWidth(width), 0);
         _inset.AddChild(content);
         _content = content;
 
@@ -157,15 +157,65 @@ internal sealed class HoverTip
         return column;
     }
 
+    /// <summary>
+    /// One line of a tip. Deliberately not autowrapped — see <see cref="Paragraph" />.
+    /// </summary>
     public static MegaLabel Line(string text, Color color, int size = LineFontSize, bool bold = false)
     {
         var label = NativeStyle.Figure(text, size, color, bold);
-        label.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         label.VerticalAlignment = VerticalAlignment.Top;
         return label;
     }
 
     private const int LineFontSize = 22;
+
+    /// <summary>The room a tip of this width leaves for text, inside its frame.</summary>
+    public static float TextWidth(float width) => width - (PaddingX * 2);
+
+    /// <summary>
+    /// A run of prose, broken to fit.
+    ///
+    /// The wrapping is done here, by measuring, rather than by Godot's
+    /// <c>AutowrapMode</c>. An autowrapping label reports a minimum width of nothing — it
+    /// will always wrap harder — and a minimum height computed from the width it currently
+    /// has. Inside a panel being sized in the same frame that width is zero, so the label
+    /// asks for one character per line and a column hundreds of pixels tall, and the tip is
+    /// sized to that. Measuring gives an exact minimum in both directions and the panel
+    /// comes out the shape it is supposed to be.
+    /// </summary>
+    public static MegaLabel Paragraph(string text, Color color, float width, int size = LineFontSize) =>
+        Line(Wrap(text, width, size), color, size);
+
+    /// <summary>
+    /// Greedy line-breaking on whole words, measured in the font it will be drawn in. A
+    /// word too long for the line is left to overhang rather than broken: these are English
+    /// sentences and card names, and a hyphen in the middle of one reads as a bug.
+    /// </summary>
+    private static string Wrap(string text, float width, int size)
+    {
+        var lines = new List<string>();
+        var line = new System.Text.StringBuilder();
+
+        foreach (var word in text.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var candidate = line.Length == 0 ? word : $"{line} {word}";
+            if (line.Length > 0 && NativeStyle.Measure(candidate, size, bold: false) > width)
+            {
+                lines.Add(line.ToString());
+                line.Clear();
+                line.Append(word);
+            }
+            else
+            {
+                line.Clear();
+                line.Append(candidate);
+            }
+        }
+
+        if (line.Length > 0)
+            lines.Add(line.ToString());
+        return string.Join('\n', lines);
+    }
 
     /// <summary>A row of controls laid out left to right, with the last one pushed right.</summary>
     public static HBoxContainer Row(int separation, params Control[] parts)

@@ -20,7 +20,13 @@ namespace WinrateTracker.WinrateTrackerCode;
 internal sealed class HomeView
 {
     private const int RowGap = 20;
-    private const int PanelGap = 20;
+
+    /// <summary>
+    /// Gap between panels sharing a row. The design draws 20 in a 1420-wide column; the
+    /// screen's column is narrower once the scrollbar is allowed for, and five character
+    /// chips across it are the tightest thing on the tab.
+    /// </summary>
+    private const int PanelGap = 16;
 
     /// <summary>
     /// How the headline and the trend divide the row. The design draws them at 620 and 780
@@ -44,7 +50,10 @@ internal sealed class HomeView
     private const float RunPipSize = 30f;
 
     private const int RunPipGap = 7;
-    private const float ChipIconSize = 46f;
+    private const float ChipIconSize = 42f;
+
+    /// <summary>Five chips share the row, so their padding is the row's tightest constraint.</summary>
+    private const int ChipPaddingX = 14;
     private const float ChipPipHeight = 10f;
     private const int ChipPipGap = 4;
 
@@ -52,7 +61,7 @@ internal sealed class HomeView
     private const float BarTipWidth = 300f;
     private const float TrendTipWidth = 470f;
 
-    private const int NameFontSize = 25;
+    private const int NameFontSize = 24;
     private const int ChipRecordFontSize = 38;
     private const int ChipFiftyFontSize = 22;
     private const int DeltaFontSize = 29;
@@ -300,7 +309,7 @@ internal sealed class HomeView
     /// </summary>
     private Control TrendHead(HomeTrend trend)
     {
-        var title = NativeStyle.Caption(trend.Title, 24);
+        var title = NativeStyle.Caption(trend.Title, NativeStyle.CaptionFontSize);
         var underlined = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Stop };
         underlined.AddThemeConstantOverride("separation", 2);
         underlined.AddChild(title);
@@ -312,12 +321,13 @@ internal sealed class HomeView
         });
 
         var lines = trend.TipLines;
+        var text = HoverTip.TextWidth(TrendTipWidth);
         _tip.Attach(
             underlined,
             () => HoverTip.Column(
-                HoverTip.Line(lines[0], NativeStyle.MeasuredColor),
-                HoverTip.Line(lines[1], NativeStyle.HeaderColor),
-                HoverTip.Line(lines[2], NativeStyle.ColumnHeaderColor, BaselineFontSize)),
+                HoverTip.Paragraph(lines[0], NativeStyle.MeasuredColor, text),
+                HoverTip.Paragraph(lines[1], NativeStyle.HeaderColor, text),
+                HoverTip.Paragraph(lines[2], NativeStyle.ColumnHeaderColor, text, BaselineFontSize)),
             TrendTipWidth);
 
         var row = HoverTip.Row(
@@ -594,8 +604,8 @@ internal sealed class HomeView
             NativeStyle.Figure("last 50", SmallFontSize, NativeStyle.ColumnHeaderColor, bold: false)));
 
         var inset = new MarginContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-        inset.AddThemeConstantOverride("margin_left", 18);
-        inset.AddThemeConstantOverride("margin_right", 18);
+        inset.AddThemeConstantOverride("margin_left", ChipPaddingX);
+        inset.AddThemeConstantOverride("margin_right", ChipPaddingX);
         inset.AddThemeConstantOverride("margin_top", 14);
         inset.AddThemeConstantOverride("margin_bottom", 16);
         inset.AddChild(column);
@@ -687,6 +697,6 @@ internal sealed class HomeView
             line.AddChild(NativeStyle.Figure(stat.Delta, DetailFontSize, NativeStyle.ToneColor(stat.DeltaTone)));
         column.AddChild(line);
 
-        return NativeStyle.Panel(column, 26, 14, 26, 16);
+        return NativeStyle.Panel(column, 22, 14, 22, 16);
     }
 }

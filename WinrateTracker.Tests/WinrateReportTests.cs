@@ -444,4 +444,24 @@ public class WinrateReportTests
         Assert.Equal("v0.100", patch.Current.Label);
         Assert.Equal("v0.98", patch.Previous!.Label);
     }
+
+    /// <summary>
+    /// A month carries a short form of its label for places with no room for the year. Only
+    /// months do: a patch label is already as short as it gets, and a block's is a range
+    /// that means nothing cut down.
+    /// </summary>
+    [Fact]
+    public void Only_months_carry_a_short_label()
+    {
+        var report = Report("WL");
+
+        Assert.Equal("Jan 2026", report.Months[0].Label);
+        Assert.Equal("Jan", report.Months[0].ShortLabel);
+        Assert.Equal("Jan", report.Months[0].Compact);
+
+        Assert.Equal("", report.Patches[0].ShortLabel);
+        Assert.Equal(report.Patches[0].Label, report.Patches[0].Compact);
+        Assert.Equal("", report.Blocks50[0].ShortLabel);
+        Assert.Equal(report.Blocks50[0].Label, report.Blocks50[0].Compact);
+    }
 }

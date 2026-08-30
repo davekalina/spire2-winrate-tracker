@@ -338,7 +338,7 @@ internal static class ReportTables
     }
 
     /// <summary>Ten pips and the gaps between them; the column has no text to measure.</summary>
-    private const float PipStripWidth = 245f;
+    private const float PipStripWidth = 216f;
 
     /// <summary>
     /// What picking each card, or each relic, was worth.

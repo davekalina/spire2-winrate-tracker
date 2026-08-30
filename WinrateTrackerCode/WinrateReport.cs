@@ -38,6 +38,16 @@ internal sealed record PeriodRow(
 {
     /// <summary>Extra column for the months table: how far a run got, in floors.</summary>
     public double AverageFloors { get; init; }
+
+    /// <summary>
+    /// A shorter form of <see cref="Label" /> for places with no room for the full one —
+    /// <c>Aug</c> where the label is <c>Aug 2026</c>. Empty where there is no shorter form,
+    /// which is most periods: a patch is already as short as it gets.
+    /// </summary>
+    public string ShortLabel { get; init; } = "";
+
+    /// <summary>The short form where there is one, the full label otherwise.</summary>
+    public string Compact => string.IsNullOrEmpty(ShortLabel) ? Label : ShortLabel;
 }
 
 /// <summary>
@@ -341,7 +351,8 @@ internal sealed record WinrateReport
     /// </summary>
     private static List<PeriodRow> PeriodsOf(
         IReadOnlyList<List<RunRecord>> groups,
-        Func<List<RunRecord>, string> label)
+        Func<List<RunRecord>, string> label,
+        Func<List<RunRecord>, string>? shortLabel = null)
     {
         var rows = new List<PeriodRow>(groups.Count);
         var cumulativeWins = 0;
@@ -361,6 +372,7 @@ internal sealed record WinrateReport
                 (double)cumulativeWins / cumulativeRuns)
             {
                 AverageFloors = group.Average(run => run.Nodes),
+                ShortLabel = shortLabel?.Invoke(group) ?? "",
             });
         }
 
@@ -407,7 +419,8 @@ internal sealed record WinrateReport
                 .OrderBy(group => group.Key, StringComparer.Ordinal)
                 .Select(group => group.ToList())
                 .ToList(),
-            group => Format.MonthName(group[0].Month));
+            group => Format.MonthName(group[0].Month),
+            group => Format.MonthAbbreviation(group[0].Month));
 
     /// <summary>
     /// One row per patch, hotfixes folded in. Ordered by version rather than by date: a

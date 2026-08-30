@@ -34,7 +34,11 @@ internal sealed class WinrateScreen : IDisposable
     /// <summary>Content inset. Wider than the native screen's, which is sized for two columns.</summary>
     private const int ContentMarginLeft = 250;
 
-    private const int ContentMarginRight = 470;
+    /// <summary>
+    /// Right inset. Sized to clear the scrollbar, which the scene anchors 567 px right of
+    /// centre — so the content has to stop by about 1500 in the reference frame.
+    /// </summary>
+    private const int ContentMarginRight = 420;
 
     /// <summary>Clears the tab row and the filter row above it.</summary>
     private const int ContentMarginTop = 250;
@@ -203,7 +207,8 @@ internal sealed class WinrateScreen : IDisposable
 
         _tip.Attach(
             _summary,
-            () => HoverTip.Column(HoverTip.Line(CoopNote, NativeStyle.CellColor)),
+            () => HoverTip.Column(HoverTip.Paragraph(
+                CoopNote, NativeStyle.CellColor, HoverTip.TextWidth(SummaryTipWidth))),
             SummaryTipWidth);
 
         ReplaceNativeContent();
@@ -628,6 +633,32 @@ internal sealed class WinrateScreen : IDisposable
         // except the character chips, which are the one thing in the body that is operated
         // rather than read.
         SealScrollContent();
+        WarnIfTooWide();
+    }
+
+    /// <summary>
+    /// Say so in the log when a tab needs more width than the content column has.
+    ///
+    /// This is worth a warning rather than being left to be noticed. The content sits in a
+    /// full-rect <see cref="MarginContainer" />, so a table that does not fit neither clips
+    /// nor scrolls — the container grows instead and the overflow runs off to the right,
+    /// under the scrollbar. That reads as a styling choice rather than a bug, and it cannot
+    /// be measured from a screenshot. Here it says which tab, and by how much.
+    /// </summary>
+    private void WarnIfTooWide()
+    {
+        if (!_screen.IsValid())
+            return;
+
+        var available = _screen.Size.X - ContentMarginLeft - ContentMarginRight;
+        var needed = _content.GetCombinedMinimumSize().X;
+        // Before the first layout the screen has no size yet and the comparison is noise.
+        if (available <= 0f || needed <= available + 1f)
+            return;
+
+        MainFile.Logger.Warn(
+            $"The {WinrateSession.Tab} tab needs {needed:0} px of width but the content "
+            + $"column is {available:0} px. It will run past the right-hand margin.");
     }
 
     /// <summary>
@@ -812,6 +843,14 @@ internal sealed class WinrateScreen : IDisposable
         if (container.GetParent() is MarginContainer inset)
         {
             _contentInset = inset;
+            // The scene anchors this full-rect and leaves grow_horizontal at Both, so a
+            // table wider than the column between the margins makes the container grow
+            // past the screen in *both* directions — the first columns of every table
+            // disappear off the left edge, behind the back button, where nothing can
+            // scroll them back. Growing rightwards instead keeps the left edge nailed to
+            // the margin: a table that is still too wide runs under the scrollbar, which
+            // is ugly but readable and recoverable.
+            inset.GrowHorizontal = Control.GrowDirection.End;
             inset.AddThemeConstantOverride("margin_left", ContentMarginLeft);
             inset.AddThemeConstantOverride("margin_right", ContentMarginRight);
             inset.AddThemeConstantOverride("margin_bottom", ContentMarginBottom);

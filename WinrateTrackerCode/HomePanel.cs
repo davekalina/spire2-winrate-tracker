@@ -233,13 +233,15 @@ internal sealed record HomePanel(
             ? period.Current.Tally.WinRate - previous.Tally.WinRate
             : 0d;
 
+        // The compact label throughout: these four boxes share one row, and "Aug 2026"
+        // three times over is most of the width of a box spent on the year.
         return new HomeStat(
-            $"{caption} · {period.Current.Label}",
+            $"{caption} · {period.Current.Compact}",
             Format.WholePercent(period.Current.Tally),
             Tone.Neutral,
             Format.WinLoss(period.Current.Tally),
             period.Previous is { } behind
-                ? $"{Format.Signed(delta * 100d, 0)} vs {behind.Label}"
+                ? $"{Format.Signed(delta * 100d, 0)} vs {behind.Compact}"
                 : "",
             ToneOf(delta));
     }
@@ -251,11 +253,11 @@ internal sealed record HomePanel(
             : 0d;
 
         return new HomeStat(
-            $"Avg floors · {month.Current.Label}",
+            $"Avg floors · {month.Current.Compact}",
             Format.Average(month.Current.AverageFloors),
             Tone.Measured,
             "reached",
-            month.Previous is { } behind ? $"{Format.Signed(delta, 1)} vs {behind.Label}" : "",
+            month.Previous is { } behind ? $"{Format.Signed(delta, 1)} vs {behind.Compact}" : "",
             ToneOf(delta));
     }
 

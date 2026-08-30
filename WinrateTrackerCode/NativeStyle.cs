@@ -452,6 +452,17 @@ internal static class NativeStyle
             ? 0f
             : Regular.GetStringSize(text, HorizontalAlignment.Left, -1, CellFontSize).X;
 
+    /// <summary>
+    /// How wide a string is at a given size. Used to wrap prose by hand: Godot's autowrap
+    /// reports a minimum width of nothing and a height computed from whatever width the
+    /// label happens to have, which inside a container that has not been laid out yet is
+    /// zero — one character per line, and a panel sized for it.
+    /// </summary>
+    public static float Measure(string text, int fontSize, bool bold) =>
+        string.IsNullOrEmpty(text)
+            ? 0f
+            : (bold ? Bold : Regular).GetStringSize(text, HorizontalAlignment.Left, -1, fontSize).X;
+
     /// <summary>The same, for a column heading — a different font at a different size.</summary>
     public static float MeasureColumnHeader(string text) =>
         string.IsNullOrEmpty(text)

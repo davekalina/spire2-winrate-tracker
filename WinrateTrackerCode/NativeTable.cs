@@ -31,10 +31,10 @@ internal static class NativeTable
     private const int IconGap = 12;
 
     /// <summary>A pip in a table row. Smaller than Home's, which is a headline in itself.</summary>
-    private const float PipWidth = 20f;
+    private const float PipWidth = 18f;
 
     private const float PipHeight = 22f;
-    private const int PipGap = 5;
+    private const int PipGap = 4;
 
     /// <summary>Gap between two sections sharing a row.</summary>
     private const int SideBySideGap = 20;
@@ -153,7 +153,8 @@ internal static class NativeTable
         var explanation = column.Tooltip;
         tip.Attach(
             underlined,
-            () => HoverTip.Column(HoverTip.Line(explanation, NativeStyle.CellColor)),
+            () => HoverTip.Column(HoverTip.Paragraph(
+                explanation, NativeStyle.CellColor, HoverTip.TextWidth(HeadingTipWidth))),
             HeadingTipWidth);
         return underlined;
     }
