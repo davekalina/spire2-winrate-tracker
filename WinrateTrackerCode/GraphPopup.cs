@@ -38,15 +38,17 @@ internal sealed class GraphPopup
     /// <summary>At most this many x-axis labels, so they cannot collide.</summary>
     private const int MaxAxisLabels = 12;
 
+    // The chart colours are the screen's, not this popup's. The Home trend draws the same
+    // two series, and two definitions of "the bar colour" is how they come to disagree.
     private static readonly Color BarColor = new(0.28f, 0.62f, 0.78f, 0.9f);
-    private static readonly Color BarTopColor = new(0.55f, 0.85f, 0.97f, 1f);
-    private static readonly Color BarHoverColor = new(0.55f, 0.85f, 0.97f, 0.55f);
-    private static readonly Color LineColor = new(0.937255f, 0.784314f, 0.317647f, 1f);
+    private static readonly Color BarTopColor = NativeStyle.MeasuredColor;
+    private static readonly Color BarHoverColor = NativeStyle.MeasuredColor with { A = 0.55f };
+    private static readonly Color LineColor = NativeStyle.HeaderColor;
     private static readonly Color GridColor = new(1f, 1f, 1f, 0.10f);
     private static readonly Color AxisColor = new(1f, 1f, 1f, 0.28f);
 
     private readonly ModalPanel _modal;
-    private Tooltip? _tooltip;
+    private HoverTip? _tooltip;
 
     private GraphPopup(ModalPanel modal) => _modal = modal;
 
@@ -62,8 +64,13 @@ internal sealed class GraphPopup
         modal.Panel.AddChild(Caption("wins per period", BarTopColor, new Vector2(PlotInsetLeft, 88f)));
         modal.Panel.AddChild(Caption("win rate cumulative", LineColor, new Vector2(PlotInsetLeft + 280f, 88f)));
 
+        // The screen's own tip, on the modal rather than under it. Sharing it is why the
+        // readout here and the one on the Home trend cannot drift into two widgets.
+        //
+        // Before the plot, not after: the plot attaches its hover targets to this as it
+        // builds them, and a tip that did not exist yet would leave every bar silent.
+        popup._tooltip = new HoverTip(modal.Panel);
         popup.BuildPlot(modal.Content, section.Series!);
-        popup._tooltip = new Tooltip(modal.Panel);
         return popup;
     }
 
@@ -237,15 +244,14 @@ internal sealed class GraphPopup
                 highlight.Color = new Color(1, 1, 1, 0.06f);
                 if (GodotObject.IsInstanceValid(bar))
                     bar.Color = BarHoverColor;
-                _tooltip?.Show(point);
             }));
             highlight.Connect(Control.SignalName.MouseExited, Callable.From(() =>
             {
                 highlight.Color = new Color(1, 1, 1, 0);
                 if (GodotObject.IsInstanceValid(bar))
                     bar.Color = BarColor;
-                _tooltip?.Hide();
             }));
+            _tooltip?.Attach(highlight, () => PeriodTip(point), TooltipWidth);
         }
     }
 
@@ -287,81 +293,22 @@ internal sealed class GraphPopup
     }
 
     /// <summary>
-    /// The readout for the period under the cursor. Its own panel rather than the game's
-    /// hover tip system, which is wired to the tip stack and to card holders and has no
-    /// business being dragged into a modal graph.
+    /// The readout for the period the cursor is on: what the bar is worth on its own, and
+    /// where the line had got to by the end of it. Two quantities on two scales, so each is
+    /// named and drawn in the colour of the mark that carries it.
     /// </summary>
-    private sealed class Tooltip
+    private static Control PeriodTip(SeriesPoint point)
     {
-        private const float PaddingX = 18f;
-        private const float PaddingY = 12f;
-        private const float LineHeight = NativeStyle.CellFontSize + 8f;
-        private const float Margin = 20f;
-
-        private readonly Control _panel;
-        private readonly MegaLabel _label;
-
-        public Tooltip(Control host)
-        {
-            _panel = new Control
-            {
-                MouseFilter = Control.MouseFilterEnum.Ignore,
-                Visible = false,
-                ZIndex = 10,
-            };
-
-            var background = new ColorRect
-            {
-                Color = new Color(0.04f, 0.06f, 0.07f, 0.96f),
-                MouseFilter = Control.MouseFilterEnum.Ignore,
-            };
-            background.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-            _panel.AddChild(background);
-
-            _label = NativeStyle.Cell("", rightAligned: false);
-            _label.Position = new Vector2(PaddingX, PaddingY);
-            _panel.AddChild(_label);
-
-            host.AddChild(_panel);
-        }
-
-        public void Show(SeriesPoint point)
-        {
-            if (!GodotObject.IsInstanceValid(_panel))
-                return;
-
-            var tally = new Tally(point.Runs, point.Wins);
-            string[] lines =
-            [
-                point.Label,
-                $"{point.Runs} runs · {Format.WinLoss(tally)}",
-                $"win rate {Format.WholePercent(tally)}",
-                $"cumulative {Format.Percent(point.CumulativeWinRate)}",
-            ];
-            _label.Text = string.Join('\n', lines);
-
-            // Sized to the text it is actually showing. A fixed box either clips the
-            // longest reading or leaves a slab of empty panel beside the shortest.
-            var size = new Vector2(
-                lines.Max(NativeStyle.MeasureCell) + PaddingX * 2f,
-                lines.Length * LineHeight + PaddingY * 2f);
-            _panel.CustomMinimumSize = size;
-            _panel.Size = size;
-
-            // Follows the cursor, clamped so it never hangs off the panel.
-            var host = _panel.GetParent<Control>();
-            var mouse = host.GetLocalMousePosition();
-            var bounds = host.Size;
-            _panel.Position = new Vector2(
-                Math.Clamp(mouse.X + Margin, 0, Math.Max(0, bounds.X - size.X)),
-                Math.Clamp(mouse.Y + Margin, 0, Math.Max(0, bounds.Y - size.Y)));
-            _panel.Visible = true;
-        }
-
-        public void Hide()
-        {
-            if (GodotObject.IsInstanceValid(_panel))
-                _panel.Visible = false;
-        }
+        var tally = new Tally(point.Runs, point.Wins);
+        return HoverTip.Column(
+            HoverTip.Line(point.Label, NativeStyle.CellColor, bold: true),
+            HoverTip.Row(
+                12,
+                HoverTip.Line($"{point.Runs} runs", NativeStyle.ColumnHeaderColor),
+                HoverTip.Line(Format.WinLoss(tally), BarTopColor),
+                HoverTip.Line(Format.WholePercent(tally), BarTopColor, bold: true)),
+            HoverTip.Line($"cumulative {Format.Percent(point.CumulativeWinRate)}", LineColor));
     }
+
+    private const float TooltipWidth = 340f;
 }

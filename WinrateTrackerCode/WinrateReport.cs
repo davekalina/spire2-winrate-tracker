@@ -40,10 +40,47 @@ internal sealed record PeriodRow(
     public double AverageFloors { get; init; }
 }
 
-/// <summary>One character's record, all-time and over its own most recent runs.</summary>
-internal sealed record CharacterRow(string Character, Tally All, Tally Last10, Tally Last50);
+/// <summary>
+/// One character's record, all-time and over its own most recent runs.
+///
+/// <paramref name="RecentRuns" /> is the same ten runs as <paramref name="Last10" />, kept
+/// one by one and oldest first, because the pip strip shows the shape of the streak and
+/// not just how it totalled.
+/// </summary>
+internal sealed record CharacterRow(
+    string Character,
+    Tally All,
+    Tally Last10,
+    Tally Last50,
+    IReadOnlyList<bool> RecentRuns);
 
-internal sealed record CountRow(string Label, int Count);
+/// <summary>
+/// One stretch of runs as the Home trend plots it: the block's own win rate as a bar, and
+/// the all-time rate as of its end as a point on the line.
+/// </summary>
+/// <param name="Label">Short axis label — the block's first run number, with a <c>+</c> when it is not full.</param>
+/// <param name="Range">The block's whole span, e.g. <c>401-442</c>, for the hover tip.</param>
+internal sealed record TrendBlock(string Label, string Range, Tally Tally, double CumulativeWinRate);
+
+/// <summary>
+/// The Home trend, sized to the archive it is drawn from.
+///
+/// Both series are percentages, so one axis serves them: <see cref="CeilingPercent" /> is
+/// the top of that axis, rounded up past the tallest bar so the best block is never drawn
+/// touching the ceiling.
+/// </summary>
+internal sealed record TrendChart(
+    int BlockRuns,
+    int Runs,
+    int CeilingPercent,
+    IReadOnlyList<TrendBlock> Blocks);
+
+/// <summary>
+/// A period beside the one before it — this month against last month, this patch against
+/// the patch before. <see cref="Previous" /> is null at the start of the archive, where
+/// there is nothing to compare against and the screen says nothing rather than guessing.
+/// </summary>
+internal sealed record PeriodComparison(PeriodRow Current, PeriodRow? Previous);
 
 /// <summary>
 /// One named bucket of runs that is not a stretch of time — a part of the day, say. No
@@ -64,9 +101,6 @@ internal sealed record PickRow(string Id, string Rarity, Tally Tally);
 /// </summary>
 internal sealed record MatrixRow(string Label, IReadOnlyList<Tally?> Cells);
 
-/// <summary>How many runs a trailing window covers, and how they went.</summary>
-internal sealed record WindowRow(int Window, Tally Tally);
-
 /// <summary>
 /// Every table the screen shows, computed in one pass over an already-filtered,
 /// oldest-first run list.
@@ -77,21 +111,43 @@ internal sealed record WindowRow(int Window, Tally Tally);
 /// </summary>
 internal sealed record WinrateReport
 {
-    /// <summary>Trailing windows shown on the Overview, largest first.</summary>
-    private static readonly int[] TrailingWindowSizes = [100, 50, 25, 10];
+    /// <summary>How many runs back the Home headline looks.</summary>
+    public const int RecentWindow = 50;
 
-    private const int TopDeathCount = 10;
-    private const int RecentRunsPerCharacter = 10;
+    /// <summary>How many runs the pip strips show, on Home and in the character table.</summary>
+    public const int RecentRunsPerCharacter = 10;
 
     public required IReadOnlyList<RunRecord> Runs { get; init; }
     public required Tally Overall { get; init; }
 
     /// <summary>
-    /// Rolling win rate as a moving window: the last 100, 50, 25, and 10 runs. A window
-    /// is omitted once it would cover the whole archive, because it would just restate
-    /// <see cref="Overall" />.
+    /// The last <see cref="RecentWindow" /> runs, or all of them if there are fewer. The
+    /// Home headline: what the archive says about how the player is going now rather than
+    /// how they have gone since they started.
     /// </summary>
-    public required IReadOnlyList<WindowRow> TrailingWindows { get; init; }
+    public required Tally Recent { get; init; }
+
+    /// <summary>
+    /// Whether <see cref="Recent" /> is a real window or simply every run again. Below the
+    /// window size the two are the same number, and a delta between them is a comparison of
+    /// a figure with itself.
+    /// </summary>
+    public bool HasRecentWindow => Runs.Count > RecentWindow;
+
+    /// <summary>
+    /// The most recent ten runs, oldest first, kept whole. The Home pip strip needs each
+    /// one on its own — its character, its ascension, and how it ended — not a tally.
+    /// </summary>
+    public required IReadOnlyList<RunRecord> RecentRuns { get; init; }
+
+    /// <summary>The Home trend chart, or null when there are no runs to plot.</summary>
+    public TrendChart? Trend { get; init; }
+
+    /// <summary>The newest month against the one before it. Null when there are no runs.</summary>
+    public PeriodComparison? Month { get; init; }
+
+    /// <summary>The newest patch against the one before it. Null when there are no runs.</summary>
+    public PeriodComparison? Patch { get; init; }
 
     /// <summary>Consecutive runs at the end of the archive that went the same way.</summary>
     public required int CurrentStreak { get; init; }
@@ -104,10 +160,7 @@ internal sealed record WinrateReport
     public DateTime? FirstRun { get; init; }
     public DateTime? LastRun { get; init; }
 
-    /// <summary>10-run blocks, newest first, each carrying the all-time rate as of its end.</summary>
-    public required IReadOnlyList<PeriodRow> Blocks10 { get; init; }
-
-    /// <summary>50-run blocks, newest first.</summary>
+    /// <summary>50-run blocks, newest first, each carrying the all-time rate as of its end.</summary>
     public required IReadOnlyList<PeriodRow> Blocks50 { get; init; }
 
     /// <summary>Characters, best win rate first.</summary>
@@ -124,11 +177,6 @@ internal sealed record WinrateReport
 
     /// <summary>One row per month, newest first, then a Total row.</summary>
     public required IReadOnlyList<MatrixRow> MonthByCharacter { get; init; }
-
-    public required IReadOnlyList<CountRow> TopDeaths { get; init; }
-
-    /// <summary>Losses bucketed by how far the run got, Act 1 first.</summary>
-    public required IReadOnlyList<CountRow> LossesByAct { get; init; }
 
     /// <summary>Runs grouped into morning, afternoon and night. See <see cref="PartOfDay" />.</summary>
     public required IReadOnlyList<GroupRow> TimeOfDay { get; init; }
@@ -147,29 +195,36 @@ internal sealed record WinrateReport
     /// <param name="runs">Filtered runs, oldest first — see <see cref="RunFilter.Apply" />.</param>
     public static WinrateReport Build(IReadOnlyList<RunRecord> runs)
     {
-        var losses = runs.Where(run => !run.Win).ToList();
         var (currentStreak, currentIsWin) = CurrentStreakOf(runs);
         var matrixCharacters = runs.Select(run => run.Character).Distinct().OrderBy(name => name, StringComparer.Ordinal).ToList();
+        var months = MonthsOf(runs);
+        var patches = PatchesOf(runs);
 
         return new WinrateReport
         {
             Runs = runs,
             Overall = Tally.Of(runs),
-            TrailingWindows = TrailingWindowsOf(runs),
+            Recent = LastOf(runs, RecentWindow),
+            RecentRuns = Slice(
+                runs,
+                Math.Max(0, runs.Count - RecentRunsPerCharacter),
+                Math.Min(RecentRunsPerCharacter, runs.Count)),
+            Trend = TrendOf(runs),
+            // Both lists read newest first, so the head of each is the period in progress
+            // and the one behind it is what to measure against.
+            Month = ComparisonOf(months),
+            Patch = ComparisonOf(patches),
             CurrentStreak = currentStreak,
             CurrentStreakIsWin = currentIsWin,
             LongestWinStreak = LongestWinStreakOf(runs),
             FirstRun = runs.Count > 0 ? runs[0].LocalStart : null,
             LastRun = runs.Count > 0 ? runs[^1].LocalStart : null,
-            Blocks10 = BlocksOf(runs, 10),
             Blocks50 = BlocksOf(runs, 50),
             Characters = CharactersOf(runs),
-            Months = MonthsOf(runs),
-            Patches = PatchesOf(runs),
+            Months = months,
+            Patches = patches,
             MatrixCharacters = matrixCharacters,
             MonthByCharacter = MonthByCharacterOf(runs, matrixCharacters),
-            TopDeaths = TopDeathsOf(losses),
-            LossesByAct = LossesByActOf(losses),
             TimeOfDay = TimeOfDayOf(runs),
             HourBlocks = HourBlocksOf(runs),
             Cards = PicksOf(runs, run => run.PickedCards, GameData.Cards),
@@ -177,11 +232,85 @@ internal sealed record WinrateReport
         };
     }
 
-    private static List<WindowRow> TrailingWindowsOf(IReadOnlyList<RunRecord> runs) =>
-        TrailingWindowSizes
-            .Where(size => runs.Count > size)
-            .Select(size => new WindowRow(size, Tally.Of(Slice(runs, runs.Count - size, size))))
-            .ToList();
+    private static PeriodComparison? ComparisonOf(IReadOnlyList<PeriodRow> periods) =>
+        periods.Count == 0 ? null : new PeriodComparison(periods[0], periods.Count > 1 ? periods[1] : null);
+
+    /// <summary>How far back the trend looks, so the chart never grows past ten bars.</summary>
+    private const int TrendWindow = 500;
+
+    /// <summary>
+    /// The Home trend: one bar per block of consecutive runs, with the all-time rate over
+    /// the top.
+    ///
+    /// Three rules, each answering a way the chart could lie:
+    ///
+    /// <list type="bullet">
+    /// <item>The block size follows the archive, so a player twenty runs in gets a trend
+    /// rather than a single bar. Blocks are always anchored at the oldest run, exactly as
+    /// <see cref="BlocksOf" /> anchors its tables, so a boundary never moves under a player
+    /// who finished one more run.</item>
+    /// <item>A trailing block holding less than half its size is dropped. Two runs at 100%
+    /// would otherwise set the ceiling for every bar beside it.</item>
+    /// <item>Only the newest <see cref="TrendWindow" /> runs are plotted, but the line is
+    /// still the rate over <em>everything</em> up to each block — that is what makes it the
+    /// all-time rate rather than the rate within the window.</item>
+    /// </list>
+    /// </summary>
+    private static TrendChart? TrendOf(IReadOnlyList<RunRecord> runs)
+    {
+        if (runs.Count == 0)
+            return null;
+
+        var blockRuns = runs.Count < SmallArchive ? 5 : runs.Count < MediumArchive ? 10 : 50;
+
+        var blocks = new List<TrendBlock>();
+        var cumulativeWins = 0;
+        var cumulativeRuns = 0;
+
+        for (var start = 0; start < runs.Count; start += blockRuns)
+        {
+            var length = Math.Min(blockRuns, runs.Count - start);
+            if (length * 2 < blockRuns)
+                break;
+
+            var tally = Tally.Of(Slice(runs, start, length));
+            cumulativeWins += tally.Wins;
+            cumulativeRuns += length;
+
+            blocks.Add(new TrendBlock(
+                length < blockRuns ? $"{start + 1}+" : Format.Count(start + 1),
+                $"{start + 1}-{start + length}",
+                tally,
+                (double)cumulativeWins / cumulativeRuns));
+        }
+
+        if (blocks.Count == 0)
+            return null;
+
+        var kept = Math.Max(1, TrendWindow / blockRuns);
+        if (blocks.Count > kept)
+            blocks.RemoveRange(0, blocks.Count - kept);
+
+        return new TrendChart(
+            blockRuns,
+            blocks.Sum(block => block.Tally.Runs),
+            CeilingPercent(blocks.Max(block => block.Tally.WinRate)),
+            blocks);
+    }
+
+    /// <summary>Below this many runs the trend blocks five runs at a time.</summary>
+    private const int SmallArchive = 60;
+
+    /// <summary>And below this, ten.</summary>
+    private const int MediumArchive = 200;
+
+    /// <summary>
+    /// The next ten per cent strictly above the tallest bar. Strictly, so the best block is
+    /// drawn short of the ceiling rather than flush against it, where it would read as
+    /// having run out of chart rather than as a value.
+    /// </summary>
+    private static int CeilingPercent(double rate) =>
+        Math.Clamp(((int)Math.Floor(rate * 100d) / 10 + 1) * 10, 10, 100);
 
     /// <summary>
     /// Fixed-size blocks counted from the <em>oldest</em> run forward, then reversed for
@@ -244,7 +373,12 @@ internal sealed record WinrateReport
             .Select(group =>
             {
                 var all = group.ToList();
-                return new CharacterRow(group.Key, Tally.Of(all), LastOf(all, 10), LastOf(all, 50));
+                return new CharacterRow(
+                    group.Key,
+                    Tally.Of(all),
+                    LastOf(all, RecentRunsPerCharacter),
+                    LastOf(all, RecentWindow),
+                    RecentOutcomesOf(all));
             })
             .OrderByDescending(row => row.All.WinRate)
             .ThenByDescending(row => row.All.Runs)
@@ -254,6 +388,18 @@ internal sealed record WinrateReport
     /// <summary>The most recent <paramref name="count" /> runs, or all of them if fewer.</summary>
     private static Tally LastOf(IReadOnlyList<RunRecord> runs, int count) =>
         Tally.Of(Slice(runs, Math.Max(0, runs.Count - count), Math.Min(count, runs.Count)));
+
+    /// <summary>
+    /// How the last few runs went, one by one and oldest first. A pip strip shows whether
+    /// four wins out of ten were four in a row or four scattered, which the tally cannot.
+    /// </summary>
+    private static IReadOnlyList<bool> RecentOutcomesOf(IReadOnlyList<RunRecord> runs) =>
+        Slice(
+                runs,
+                Math.Max(0, runs.Count - RecentRunsPerCharacter),
+                Math.Min(RecentRunsPerCharacter, runs.Count))
+            .Select(run => run.Win)
+            .ToList();
 
     private static List<PeriodRow> MonthsOf(IReadOnlyList<RunRecord> runs) =>
         PeriodsOf(
@@ -315,20 +461,6 @@ internal sealed record WinrateReport
             characters.Select(character => (Tally?)byCharacter[character]).ToList()));
         return rows;
     }
-
-    private static List<CountRow> TopDeathsOf(IReadOnlyList<RunRecord> losses) =>
-        losses.GroupBy(run => string.IsNullOrEmpty(run.KilledBy) ? "Unknown" : run.KilledBy)
-            .Select(group => new CountRow(group.Key, group.Count()))
-            .OrderByDescending(row => row.Count)
-            .ThenBy(row => row.Label, StringComparer.Ordinal)
-            .Take(TopDeathCount)
-            .ToList();
-
-    private static List<CountRow> LossesByActOf(IReadOnlyList<RunRecord> losses) =>
-        losses.GroupBy(run => run.ActReached)
-            .OrderBy(group => group.Key)
-            .Select(group => new CountRow($"Act {group.Key}", group.Count()))
-            .ToList();
 
     private static int LongestWinStreakOf(IReadOnlyList<RunRecord> runs)
     {

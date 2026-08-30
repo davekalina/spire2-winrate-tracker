@@ -38,7 +38,12 @@ a screen that silently did nothing:
 2. **Scene casts.** A scene's *root* must carry the script being cast to —
    `screens/paginator` does not. Check the scripted *children* too: `Node.GetParent<T>()`
    is a hard cast, and some widgets use it on their parent.
-3. **The game log**, as above.
+3. **Resource paths.** `GameArt` and `NativeStyle` load the game's own textures and font
+   variations by path, and a path is not checked by the compiler. `GameArt` asks
+   `ResourceLoader.Exists` before loading and drops the key on a miss, so a moved texture
+   costs an icon rather than a screen — but check the paths against the shipped `.pck`
+   after a game update rather than waiting to notice a blank column.
+4. **The game log**, as above.
 
 ## Publish to the Steam Workshop
 

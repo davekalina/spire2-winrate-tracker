@@ -31,11 +31,15 @@ public class WinrateReportTests
         Assert.Equal(0, report.Overall.Runs);
         Assert.Equal(0d, report.Overall.WinRate);
         Assert.Null(report.FirstRun);
-        Assert.Empty(report.Blocks10);
+        Assert.Empty(report.Blocks50);
         Assert.Empty(report.Characters);
         Assert.Empty(report.Months);
         Assert.Empty(report.Patches);
         Assert.Empty(report.MonthByCharacter);
+        Assert.Empty(report.RecentRuns);
+        Assert.Null(report.Trend);
+        Assert.Null(report.Month);
+        Assert.Null(report.Patch);
     }
 
     [Fact]
@@ -47,38 +51,44 @@ public class WinrateReportTests
         Assert.Equal(new DateTime(2026, 1, 3), report.LastRun!.Value.Date);
     }
 
-    // ── trailing windows ─────────────────────────────────────────────────────
+    // ── the recent window ────────────────────────────────────────────────────
 
     [Fact]
-    public void Trailing_windows_measure_the_most_recent_runs()
+    public void The_recent_window_measures_the_last_fifty_runs()
     {
-        // 100 losses, then 10 wins.
-        var report = Report(new string('L', 100) + new string('W', 10));
+        // 100 losses, then 50 wins.
+        var report = Report(new string('L', 100) + new string('W', 50));
 
-        var last10 = Assert.Single(report.TrailingWindows, window => window.Window == 10);
-        Assert.Equal(10, last10.Tally.Wins);
-        Assert.Equal(10, last10.Tally.Runs);
+        Assert.Equal(50, report.Recent.Runs);
+        Assert.Equal(50, report.Recent.Wins);
+        Assert.True(report.HasRecentWindow);
+    }
 
-        var last25 = Assert.Single(report.TrailingWindows, window => window.Window == 25);
-        Assert.Equal(10, last25.Tally.Wins);
-        Assert.Equal(25, last25.Tally.Runs);
+    /// <summary>
+    /// Below fifty runs the window is every run there is. It still reports, because the
+    /// headline has to say something — but it admits it is not a window, so the screen does
+    /// not draw a delta of a figure against itself.
+    /// </summary>
+    [Fact]
+    public void A_short_archive_has_no_recent_window_to_speak_of()
+    {
+        var report = Report(new string('W', 30));
+
+        Assert.Equal(30, report.Recent.Runs);
+        Assert.Equal(report.Overall, report.Recent);
+        Assert.False(report.HasRecentWindow);
     }
 
     [Fact]
-    public void A_window_covering_the_whole_archive_is_omitted_as_a_duplicate_of_overall()
+    public void The_last_ten_runs_are_kept_whole_and_oldest_first()
     {
-        // 30 runs: 10 and 25 fit inside, 50 and 100 would not.
-        var windows = Report(new string('W', 30)).TrailingWindows.Select(window => window.Window).ToList();
+        var report = Report(new string('L', 20) + "WLWWLWLLLW");
 
-        Assert.Equal([25, 10], windows);
-    }
-
-    [Fact]
-    public void Windows_are_listed_largest_first()
-    {
-        var windows = Report(new string('W', 200)).TrailingWindows.Select(window => window.Window).ToList();
-
-        Assert.Equal([100, 50, 25, 10], windows);
+        Assert.Equal(10, report.RecentRuns.Count);
+        Assert.Equal(
+            [true, false, true, true, false, true, false, false, false, true],
+            report.RecentRuns.Select(run => run.Win));
+        Assert.Equal(report.LastRun, report.RecentRuns[^1].LocalStart);
     }
 
     // ── streaks ──────────────────────────────────────────────────────────────
@@ -121,32 +131,32 @@ public class WinrateReportTests
     [Fact]
     public void Blocks_are_anchored_at_the_oldest_run_and_shown_newest_first()
     {
-        var report = Report(new string('L', 25));
+        var report = Report(new string('L', 125));
 
-        Assert.Equal(3, report.Blocks10.Count);
-        Assert.Equal("21-25", report.Blocks10[0].Label);
-        Assert.Equal("11-20", report.Blocks10[1].Label);
-        Assert.Equal("1-10", report.Blocks10[2].Label);
+        Assert.Equal(3, report.Blocks50.Count);
+        Assert.Equal("101-125", report.Blocks50[0].Label);
+        Assert.Equal("51-100", report.Blocks50[1].Label);
+        Assert.Equal("1-50", report.Blocks50[2].Label);
     }
 
     [Fact]
     public void The_partial_block_is_the_newest_one()
     {
-        var newest = Report(new string('L', 25)).Blocks10[0];
+        var newest = Report(new string('L', 125)).Blocks50[0];
 
-        Assert.Equal(5, newest.Tally.Runs);
-        Assert.Equal(new DateTime(2026, 1, 21), newest.From.Date);
-        Assert.Equal(new DateTime(2026, 1, 25), newest.To.Date);
+        Assert.Equal(25, newest.Tally.Runs);
+        Assert.Equal(new DateTime(2026, 1, 1).AddDays(100), newest.From.Date);
+        Assert.Equal(new DateTime(2026, 1, 1).AddDays(124), newest.To.Date);
     }
 
     [Fact]
     public void Each_block_carries_the_all_time_rate_as_of_its_own_end()
     {
-        // Ten losses, then ten wins: 0% after the first block, 50% after the second.
-        var report = Report(new string('L', 10) + new string('W', 10));
+        // Fifty losses, then fifty wins: 0% after the first block, 50% after the second.
+        var report = Report(new string('L', 50) + new string('W', 50));
 
-        var newest = report.Blocks10[0];
-        var oldest = report.Blocks10[1];
+        var newest = report.Blocks50[0];
+        var oldest = report.Blocks50[1];
 
         Assert.Equal(1.0d, newest.Tally.WinRate, 6);
         Assert.Equal(0.5d, newest.CumulativeWinRate, 6);
@@ -159,19 +169,7 @@ public class WinrateReportTests
     {
         var report = Report("WLLWLWLLLWLLWLLLWLLWLLLW");
 
-        Assert.Equal(report.Overall.WinRate, report.Blocks10[0].CumulativeWinRate, 6);
         Assert.Equal(report.Overall.WinRate, report.Blocks50[0].CumulativeWinRate, 6);
-    }
-
-    [Fact]
-    public void Fifty_run_blocks_use_the_same_rules_at_a_coarser_size()
-    {
-        var report = Report(new string('L', 120));
-
-        Assert.Equal(3, report.Blocks50.Count);
-        Assert.Equal("101-120", report.Blocks50[0].Label);
-        Assert.Equal("51-100", report.Blocks50[1].Label);
-        Assert.Equal("1-50", report.Blocks50[2].Label);
     }
 
     // ── characters ───────────────────────────────────────────────────────────
@@ -325,45 +323,125 @@ public class WinrateReportTests
         Assert.Equal([new Tally(2, 1), new Tally(1, 0)], report.MonthByCharacter[2].Cells);
     }
 
-    // ── deaths ───────────────────────────────────────────────────────────────
+    // ── the trend ────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Top_deaths_rank_the_encounters_that_ended_runs()
+    public void The_trend_blocks_fifty_runs_at_a_time_once_the_archive_is_big_enough()
     {
-        var runs = new List<RunRecord>
-        {
-            Run(Unix(2026, 1, 1), killedBy: "Decimillipede"),
-            Run(Unix(2026, 1, 2), killedBy: "Decimillipede"),
-            Run(Unix(2026, 1, 3), killedBy: "Queen"),
-            Run(Unix(2026, 1, 4), win: true),
-        };
+        var trend = Report(new string('L', 250)).Trend!;
 
-        var deaths = WinrateReport.Build(runs).TopDeaths;
+        Assert.Equal(50, trend.BlockRuns);
+        Assert.Equal(250, trend.Runs);
+        Assert.Equal(["1", "51", "101", "151", "201"], trend.Blocks.Select(block => block.Label));
+        Assert.Equal("201-250", trend.Blocks[^1].Range);
+    }
 
-        Assert.Equal([new CountRow("Decimillipede", 2), new CountRow("Queen", 1)], deaths);
+    /// <summary>
+    /// A player twenty runs in should get a trend rather than a single bar, so the block
+    /// size follows the archive: five runs under sixty, ten under two hundred.
+    /// </summary>
+    [Theory]
+    [InlineData(20, 5)]
+    [InlineData(59, 5)]
+    [InlineData(60, 10)]
+    [InlineData(199, 10)]
+    [InlineData(200, 50)]
+    public void The_block_size_follows_the_size_of_the_archive(int runs, int expected)
+    {
+        Assert.Equal(expected, Report(new string('L', runs)).Trend!.BlockRuns);
+    }
+
+    /// <summary>
+    /// Two runs at 100% would set the ceiling for every bar beside them, so a trailing
+    /// sliver is dropped. A block that is merely short is kept and marked with a plus.
+    /// </summary>
+    [Fact]
+    public void A_trailing_sliver_is_dropped_but_a_half_full_block_is_kept()
+    {
+        // 202 runs: four full blocks of fifty and two left over.
+        var dropped = Report(new string('L', 202)).Trend!;
+
+        Assert.Equal(200, dropped.Runs);
+        Assert.Equal(4, dropped.Blocks.Count);
+        Assert.Equal("151", dropped.Blocks[^1].Label);
+
+        // 240 runs: the last block holds forty, which is worth plotting.
+        var kept = Report(new string('L', 240)).Trend!;
+
+        Assert.Equal(240, kept.Runs);
+        Assert.Equal("201+", kept.Blocks[^1].Label);
+        Assert.Equal("201-240", kept.Blocks[^1].Range);
     }
 
     [Fact]
-    public void A_loss_with_no_recorded_killer_is_counted_as_unknown()
+    public void The_trend_reads_oldest_first_and_carries_the_running_all_time_rate()
     {
-        var deaths = WinrateReport.Build([Run(Unix(2026, 1, 1))]).TopDeaths;
+        var trend = Report(new string('L', 100) + new string('W', 100)).Trend!;
 
-        Assert.Equal(new CountRow("Unknown", 1), Assert.Single(deaths));
+        Assert.Equal(0d, trend.Blocks[0].Tally.WinRate, 6);
+        Assert.Equal(1.0d, trend.Blocks[^1].Tally.WinRate, 6);
+        Assert.Equal(0d, trend.Blocks[0].CumulativeWinRate, 6);
+        Assert.Equal(0.5d, trend.Blocks[^1].CumulativeWinRate, 6);
     }
 
+    /// <summary>
+    /// The ceiling clears the tallest bar rather than meeting it, so the best block reads as
+    /// a value instead of as having run out of chart.
+    /// </summary>
     [Fact]
-    public void Losses_by_act_are_ordered_by_act_and_exclude_wins()
+    public void The_ceiling_is_the_next_ten_per_cent_above_the_tallest_bar()
+    {
+        // Blocks of fifty: 19 wins is 38%, 20 is exactly 40%.
+        Assert.Equal(40, Report(Blocks50(19, 19, 19, 19)).Trend!.CeilingPercent);
+        Assert.Equal(50, Report(Blocks50(20, 20, 20, 20)).Trend!.CeilingPercent);
+        Assert.Equal(10, Report(new string('L', 200)).Trend!.CeilingPercent);
+        Assert.Equal(100, Report(new string('W', 200)).Trend!.CeilingPercent);
+    }
+
+    /// <summary>Four fifty-run blocks, each with the given number of wins first.</summary>
+    private static string Blocks50(params int[] wins) =>
+        string.Concat(wins.Select(count => new string('W', count) + new string('L', 50 - count)));
+
+    // ── this month, this patch ───────────────────────────────────────────────
+
+    [Fact]
+    public void The_month_comparison_is_the_newest_month_against_the_one_before()
     {
         var runs = new List<RunRecord>
         {
-            Run(Unix(2026, 1, 1), actReached: 3),
-            Run(Unix(2026, 1, 2), actReached: 1),
-            Run(Unix(2026, 1, 3), actReached: 1),
-            Run(Unix(2026, 1, 4), win: true),
+            Run(Unix(2026, 1, 5)),
+            Run(Unix(2026, 1, 6)),
+            Run(Unix(2026, 2, 3), win: true),
         };
 
-        var byAct = WinrateReport.Build(runs).LossesByAct;
+        var month = WinrateReport.Build(runs).Month!;
 
-        Assert.Equal([new CountRow("Act 1", 2), new CountRow("Act 3", 1)], byAct);
+        Assert.Equal("Feb 2026", month.Current.Label);
+        Assert.Equal("Jan 2026", month.Previous!.Label);
+    }
+
+    [Fact]
+    public void The_first_month_has_nothing_behind_it_to_compare_with()
+    {
+        var report = Report("WL");
+
+        Assert.Equal("Jan 2026", report.Month!.Current.Label);
+        Assert.Null(report.Month.Previous);
+        Assert.Null(report.Patch!.Previous);
+    }
+
+    [Fact]
+    public void The_patch_comparison_follows_the_version_order_the_table_uses()
+    {
+        var runs = new List<RunRecord>
+        {
+            Run(Unix(2026, 1, 1), buildId: "v0.98.0"),
+            Run(Unix(2026, 1, 2), buildId: "v0.100.0"),
+        };
+
+        var patch = WinrateReport.Build(runs).Patch!;
+
+        Assert.Equal("v0.100", patch.Current.Label);
+        Assert.Equal("v0.98", patch.Previous!.Label);
     }
 }

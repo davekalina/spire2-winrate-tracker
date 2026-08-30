@@ -39,7 +39,18 @@ internal sealed record RunFilter
     /// </summary>
     public bool IgnoreEarlyAbandons { get; init; } = true;
 
-    public static RunFilter Default { get; } = new() { Ascension = 10 };
+    /// <summary>
+    /// What the screen starts on before it has read anything: solo, no rerolls, and every
+    /// ascension.
+    ///
+    /// It cannot name an ascension. Most players of this mod sit on one — usually the
+    /// highest they have unlocked — and mixing ascensions makes a win rate mean two things
+    /// at once, so the screen does narrow to one. But which one is a fact about the
+    /// archive, not a constant: <see cref="FilterBar" /> selects the highest ascension
+    /// actually played as soon as the runs are in. Hard-coding ten here would show a player
+    /// who is on A4 an empty screen until they found the control.
+    /// </summary>
+    public static RunFilter Default { get; } = new();
 
     public bool Matches(RunRecord run) =>
         run.PlayerCount <= 1

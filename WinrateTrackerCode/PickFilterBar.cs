@@ -3,12 +3,13 @@ using Godot;
 namespace WinrateTracker.WinrateTrackerCode;
 
 /// <summary>
-/// The second filter row, which belongs to the Cards and Relics tabs and is hidden
-/// everywhere else.
+/// The two filters that belong to the Cards and Relics tabs, hidden everywhere else.
 ///
-/// It is a row of its own rather than more widgets on the shared row because these narrow
-/// the lists rather than the runs. Keeping them apart also keeps the tab's own question —
-/// which picks am I looking at — visually separate from the archive-wide one above it.
+/// They sit on the end of the shared filter row behind a divider rather than on a second
+/// row of their own. As arrow pairs they needed one — five filters was ten focus stops and
+/// more width than the row had — but as combo boxes all five fit on one line, and the
+/// divider is enough to say that these two narrow the list while the three before them
+/// narrow the runs.
 ///
 /// One rarity control serves both tabs, reading and writing whichever of the two the open
 /// tab owns. Cards and relics do not share a rarity vocabulary and are never on screen
@@ -28,25 +29,58 @@ internal sealed class PickFilterBar
     private static readonly int[] Minimums = [1, 2, 3, 5, 10, 20, 50];
 
     private const string AnyRarityText = "All";
+    private const int Separation = 14;
 
-    private readonly PaginatorRow _row = new();
-    private readonly PaginatorRow.Cycler _minimum;
-    private readonly PaginatorRow.Cycler _rarity;
+    private readonly HBoxContainer _row;
+    private readonly ComboBox _minimum;
+    private readonly ComboBox _rarity;
 
-    public PickFilterBar()
+    public PickFilterBar(Control host)
     {
-        _minimum = _row.Add("Minimum picks");
-        _rarity = _row.Add("Rarity");
+        _row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Pass };
+        _row.AddThemeConstantOverride("separation", Separation);
 
-        _row.Changed += Publish;
-        _row.Changed += () => Changed?.Invoke();
+        // A hairline between the filters that narrow runs and the ones that narrow rows.
+        _row.AddChild(new ColorRect
+        {
+            Color = NativeStyle.CellColor with { A = 0.16f },
+            CustomMinimumSize = new Vector2(2, DividerHeight),
+            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        });
+
+        _minimum = Add(host, "Min picks");
+        _rarity = Add(host, "Rarity");
+
+        foreach (var combo in Combos)
+        {
+            combo.Changed += Publish;
+            combo.Changed += () => Changed?.Invoke();
+        }
     }
 
-    public Control Root => _row.Root;
+    private const float DividerHeight = 34f;
 
-    public List<Control> Controls => _row.Controls;
+    private ComboBox Add(Control host, string caption)
+    {
+        var combo = new ComboBox(host, caption);
+        _row.AddChild(combo.Root);
+        return combo;
+    }
 
-    /// <summary>Raised after the player pages any control. The screen rebuilds its tables.</summary>
+    private IEnumerable<ComboBox> Combos => [_minimum, _rarity];
+
+    public Control Root => _row;
+
+    public List<Control> Controls => Combos.Select(combo => combo.Root).ToList();
+
+    public void Close()
+    {
+        foreach (var combo in Combos)
+            combo.Close();
+    }
+
+    /// <summary>Raised after the player commits a filter. The screen rebuilds its tables.</summary>
     public event Action? Changed;
 
     /// <summary>
@@ -57,13 +91,14 @@ internal sealed class PickFilterBar
     {
         var filter = WinrateSession.Picks;
         var relics = ShowingRelics;
+        var table = relics ? GameData.Relics : GameData.Cards;
 
         _minimum.SetOptions(
-            Minimums.Select(minimum => new PaginatorRow.Option(MinimumText(minimum), minimum)),
+            Minimums.Select(minimum => new ComboBox.Option(MinimumText(minimum), minimum)),
             filter.MinimumPicks);
 
         _rarity.SetOptions(
-            RarityOptions(relics ? report.Relics : report.Cards),
+            RarityOptions(relics ? report.Relics : report.Cards, table),
             relics ? filter.RelicRarity : filter.CardRarity);
 
         // The selection can move when a list shrinks — a rarity that is no longer on screen
@@ -77,10 +112,10 @@ internal sealed class PickFilterBar
     private static string MinimumText(int minimum) =>
         minimum == 1 ? "Any" : $"{minimum}+";
 
-    private static IEnumerable<PaginatorRow.Option> RarityOptions(IReadOnlyList<PickRow> picks) =>
+    private static IEnumerable<ComboBox.Option> RarityOptions(IReadOnlyList<PickRow> picks, string table) =>
         PickFilter.RaritiesIn(picks)
-            .Select(rarity => new PaginatorRow.Option(rarity, rarity))
-            .Prepend(new PaginatorRow.Option(AnyRarityText, PickFilter.AnyRarity));
+            .Select(rarity => new ComboBox.Option(rarity, rarity, ArtKey.Rarity(table, rarity)))
+            .Prepend(new ComboBox.Option(AnyRarityText, PickFilter.AnyRarity));
 
     /// <summary>
     /// Write the row back to the session. The rarity control only speaks for the tab it is

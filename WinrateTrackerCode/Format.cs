@@ -74,6 +74,24 @@ internal static class Format
         return month;
     }
 
+    /// <summary>
+    /// A change, with the direction as an arrow rather than a sign: <c>▲ 10.9</c>,
+    /// <c>▼ 0.8</c>, <c>▬ 0</c>.
+    ///
+    /// An arrow because these sit beside the figure they qualify, at a glance distance,
+    /// where a leading minus is easy to lose against a decimal point. The magnitude is
+    /// always written unsigned — the arrow already carries the sign, and a "▼ -2" reads as
+    /// a double negative.
+    /// </summary>
+    /// <param name="decimals">0 for whole percentage points, 1 where a tenth matters.</param>
+    public static string Signed(double change, int decimals)
+    {
+        var arrow = change > 0d ? '▲' : change < 0d ? '▼' : '▬';
+        var magnitude = Math.Abs(change)
+            .ToString(decimals == 0 ? "0" : "0." + new string('0', decimals), CultureInfo.InvariantCulture);
+        return $"{arrow} {magnitude}";
+    }
+
     /// <summary>e.g. <c>3 wins</c> / <c>2 losses</c> / <c>none</c>.</summary>
     public static string Streak(int length, bool isWin)
     {

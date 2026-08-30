@@ -6,13 +6,13 @@ namespace WinrateTracker.WinrateTrackerCode;
 /// The filter and the open tab are a question the player was asking, not a property of
 /// the screen, so closing and reopening should not throw them away. This lasts as long as
 /// the game does; it is not written to disk, so a fresh session opens on the default
-/// (Ascension 10, every character, finished runs only).
+/// (the highest ascension played, every character, finished runs only).
 /// </summary>
 internal static class WinrateSession
 {
     public static RunFilter Filter { get; set; } = RunFilter.Default;
 
-    public static ReportTab Tab { get; set; } = ReportTab.Overview;
+    public static ReportTab Tab { get; set; } = ReportTab.Home;
 
     /// <summary>What the Cards and Relics tabs are narrowed to. Only those tabs read it.</summary>
     public static PickFilter Picks { get; set; } = PickFilter.Default;

@@ -37,21 +37,18 @@ internal sealed class WinrateScreen : IDisposable
     private const int ContentMarginRight = 470;
 
     /// <summary>Clears the tab row and the filter row above it.</summary>
-    private const int ContentMarginTop = 288;
-
-    /// <summary>
-    /// Extra height the filter band takes on the Cards and Relics tabs, where a second row
-    /// of filters appears. The content and the scrollbar drop by the same amount, so the
-    /// band never covers the table under it.
-    /// </summary>
-    private const float PickRowHeight = 96f;
+    private const int ContentMarginTop = 250;
 
     private const int ContentMarginBottom = 100;
 
     /// <summary>Filter row position, below the tabs, in the screen's 1920x1080 reference frame.</summary>
-    private const float FilterRowTop = -392f;
+    private const float FilterRowTop = -388f;
 
-    private const float FilterRowHeight = 132f;
+    /// <summary>
+    /// One combo box plus the band's own padding. It used to grow on the pick tabs; every
+    /// filter fits on one row now, so this is the height on every tab.
+    /// </summary>
+    private const float FilterRowHeight = 76f;
 
     /// <summary>The screen's design height; the scroll mask's gradient is a fraction of it.</summary>
     private const float ReferenceHeight = 1080f;
@@ -97,9 +94,10 @@ internal sealed class WinrateScreen : IDisposable
     private FilterBar _filters = null!;
     private MarginContainer? _contentInset;
     private PickFilterBar _pickFilters = null!;
-    private Control _filterFrame = null!;
     private VBoxContainer _content = null!;
     private MegaLabel _summary = null!;
+    private HoverTip _tip = null!;
+    private HomeView _home = null!;
     private GraphPopup? _graph;
     private SettingsPopup? _settings;
     private Control? _gear;
@@ -133,14 +131,32 @@ internal sealed class WinrateScreen : IDisposable
         // Everything that does not need the screen is built first, while nothing is
         // parented yet. If any of it throws, the stack is left exactly as it was rather
         // than holding a half-built screen.
-        _filters = new FilterBar();
+        // Parented to the screen, because both hang over everything else on it: a
+        // drop-down list clipped by the filter row, or a tip clipped by the panel it
+        // belongs to, would be worse than not having one.
+        _tip = new HoverTip(_screen);
+
+        _filters = new FilterBar(_screen);
         _filters.Changed += Rebuild;
 
-        _pickFilters = new PickFilterBar();
+        _pickFilters = new PickFilterBar(_screen);
         _pickFilters.Changed += Rebuild;
 
-        _summary = NativeStyle.Cell("", rightAligned: false, header: true);
-        _summary.HorizontalAlignment = HorizontalAlignment.Center;
+        // Pressing a character chip is another way of working the character filter, so it
+        // goes through the filter rather than around it — one path, one place the
+        // selection lives, and the combo box updates to agree with the chip.
+        _home = new HomeView(_tip, character =>
+        {
+            // SelectCharacter redraws the tab, which frees the chip that was just pressed —
+            // so the chain is rebuilt and the cursor put back afterwards, in that order.
+            _filters.SelectCharacter(character);
+            RelinkFocus();
+            _home.RestoreFocus();
+        });
+
+        _summary = NativeStyle.Figure("", NativeStyle.ColumnHeaderFontSize, NativeStyle.ColumnHeaderColor);
+        _summary.HorizontalAlignment = HorizontalAlignment.Right;
+        _summary.VerticalAlignment = VerticalAlignment.Center;
 
         _content = new VBoxContainer();
         _content.AddThemeConstantOverride("separation", NativeStyle.SectionSeparation);
@@ -185,9 +201,15 @@ internal sealed class WinrateScreen : IDisposable
                 Callable.From<NClickableControl>(_ => Show(tab)));
         }
 
+        _tip.Attach(
+            _summary,
+            () => HoverTip.Column(HoverTip.Line(CoopNote, NativeStyle.CellColor)),
+            SummaryTipWidth);
+
         ReplaceNativeContent();
         RaiseContentFade();
         LowerScrollbar();
+        LiftContentBelowFilters();
         AddGearButton(tabContainer);
         _screen.AddChild(BuildByline());
         // Added last so the filter row sits above the scroll body in draw order.
@@ -226,6 +248,24 @@ internal sealed class WinrateScreen : IDisposable
     {
         if (Scrollbar is { } scrollbar)
             scrollbar.GrowVertical = Control.GrowDirection.End;
+    }
+
+    /// <summary>
+    /// Start the tables and the scroll track below the filter band. One height on every
+    /// tab now that every filter fits on one row, so this is set once rather than per tab.
+    /// </summary>
+    private void LiftContentBelowFilters()
+    {
+        if (_contentInset is not null && _contentInset.IsValid())
+            _contentInset.AddThemeConstantOverride("margin_top", ContentMarginTop);
+
+        if (Scrollbar is { } scrollbar)
+        {
+            scrollbar.OffsetTop = FilterRowTop + FilterRowHeight + ScrollbarGap;
+            scrollbar.CustomMinimumSize = new Vector2(
+                scrollbar.CustomMinimumSize.X,
+                Math.Max(0f, scrollbar.OffsetBottom - scrollbar.OffsetTop));
+        }
     }
 
     /// <summary>
@@ -296,9 +336,17 @@ internal sealed class WinrateScreen : IDisposable
         if (tabs.Count > 0)
             rows.Add(tabs);
 
-        AddRow(rows, _filters.Controls);
+        // The pick filters share the filter row, so they are the same focus row too —
+        // left and right walk straight from Window onto Min picks.
+        var filters = _filters.Controls;
         if (_pickFilters.Root.IsValid() && _pickFilters.Root.Visible)
-            AddRow(rows, _pickFilters.Controls);
+            filters = filters.Concat(_pickFilters.Controls).ToList();
+        AddRow(rows, filters);
+
+        // Home's character chips are a row of buttons in the body, between the filters and
+        // the tables. They are the only thing in the scrolling content that is operated
+        // rather than read, so they are the one exception to SealScrollContent.
+        AddRow(rows, _home.Controls);
 
         if (rows.Count == 0)
             return;
@@ -365,8 +413,12 @@ internal sealed class WinrateScreen : IDisposable
     /// </summary>
     private void SealScrollContent()
     {
+        // Home's character chips are the exception: they are buttons, they are chained into
+        // the focus rows by RelinkFocus, and blinding them here would leave a gamepad able
+        // to see the row but not reach it.
+        var keep = _home.Controls;
         foreach (var node in _content.FindChildren("*", "Control", recursive: true, owned: false))
-            if (node is Control control)
+            if (node is Control control && !keep.Contains(control))
                 control.FocusMode = Control.FocusModeEnum.None;
     }
 
@@ -447,7 +499,7 @@ internal sealed class WinrateScreen : IDisposable
         if (index >= 0 && index < _tabs.Count)
             _tabs[index].ForceTabPressed();
         else
-            Show(ReportTab.Overview);
+            Show(ReportTab.Home);
 
         // The borrowed screen hands the focus system NGeneralStatsGrid's first stat entry,
         // which this screen hides — so on a gamepad the player would open onto a focus
@@ -488,12 +540,18 @@ internal sealed class WinrateScreen : IDisposable
 
     private void Show(ReportTab tab)
     {
+        // A list left open across a tab switch would be hanging over the new tab, still
+        // holding cancel, pointed at options that no longer belong to anything.
+        _filters.Close();
+        _pickFilters.Close();
+        _tip.Hide();
+
         WinrateSession.Tab = tab;
-        // The pick tabs carry a second filter row, so the header band and the focus chain
-        // both change shape with the tab.
+        // Which filters apply changes with the tab, and Home puts a row of character chips
+        // between the filters and the tables, so the focus chain changes shape too.
         LayOutForTab();
-        RelinkFocus();
         Rebuild();
+        RelinkFocus();
     }
 
     /// <summary>
@@ -522,16 +580,37 @@ internal sealed class WinrateScreen : IDisposable
         Control replacement;
         try
         {
-            var runs = WinrateSession.Filter.Apply(RunArchive.Runs);
-            var report = WinrateReport.Build(runs);
+            var tab = WinrateSession.Tab;
+            var filter = WinrateSession.Filter;
+            // The Characters tab is itself the comparison between characters, so narrowing
+            // to one there would leave a table of a single row. Its control is hidden, and
+            // the filter it holds is genuinely not applied rather than silently applied
+            // behind a hidden control.
+            var report = WinrateReport.Build(
+                (tab == ReportTab.Characters ? filter with { Character = null } : filter)
+                .Apply(RunArchive.Runs));
+
             _summary.SetTextAutoSize(SummaryText(report));
             // Which rarities exist depends on the runs in view, so the pick filter's own
             // options are refreshed before they are read.
             _pickFilters.Rebuild(report);
-            replacement = NativeTable.BuildTab(
-                ReportTables.Build(WinrateSession.Tab, report, WinrateSession.Picks),
-                EmptyMessage(),
-                ShowGraph);
+
+            // A tip anchored to a row that is about to be freed would be left on screen
+            // over the replacement.
+            _tip.Hide();
+
+            // Dropped before the tab is drawn, not after: the chips are about to be freed
+            // along with the rest of the old tab, and SealScrollContent below compares
+            // against this list.
+            _home.Clear();
+
+            replacement = tab == ReportTab.Home
+                ? _home.Build(BuildHome(report, filter), EmptyMessage())
+                : NativeTable.BuildTab(
+                    ReportTables.Build(tab, report, WinrateSession.Picks),
+                    EmptyMessage(),
+                    ShowGraph,
+                    _tip);
         }
         catch (Exception exception)
         {
@@ -545,8 +624,25 @@ internal sealed class WinrateScreen : IDisposable
             child.QueueFree();
         }
         _content.AddChild(replacement);
-        // The replacement is new nodes, so its focus stops have to be taken off again.
+        // The replacement is new nodes, so its focus stops have to be taken off again —
+        // except the character chips, which are the one thing in the body that is operated
+        // rather than read.
         SealScrollContent();
+    }
+
+    /// <summary>
+    /// The Home tab's contents.
+    ///
+    /// The chips are built from the archive under every filter <em>but</em> the character
+    /// one. They are how that filter is set, so reading them from the same report as the
+    /// rest of the tab would collapse the row to whichever chip had just been pressed.
+    /// </summary>
+    private static HomePanel BuildHome(WinrateReport report, RunFilter filter)
+    {
+        var everyCharacter = filter.Character is null
+            ? report
+            : WinrateReport.Build((filter with { Character = null }).Apply(RunArchive.Runs));
+        return HomePanel.Build(report, everyCharacter.Characters, filter.Character);
     }
 
     private static string EmptyMessage()
@@ -564,19 +660,27 @@ internal sealed class WinrateScreen : IDisposable
     }
 
     /// <summary>
-    /// The always-visible line under the filters. It states the co-op exclusion and any
-    /// unreadable files, because a run silently missing from a win rate is worse than a
-    /// win rate that admits what it left out.
+    /// What the archive in view amounts to, on the right-hand end of the filter row.
+    ///
+    /// The co-op rule moved into this line's hover tip — it is a standing fact, not news,
+    /// and it was taking a row of the screen to repeat on every visit. An unreadable file
+    /// stays in the line itself: that is news, and a run silently missing from a win rate is
+    /// worse than a win rate that admits what it left out.
+    ///
+    /// On the pick tabs the record is dropped and only the rate kept. The row is carrying
+    /// five filters there and the record is the least of the three figures.
     /// </summary>
     private static string SummaryText(WinrateReport report)
     {
         if (!RunArchive.HasLoaded)
             return "Reading run history…";
 
+        var runs = $"{report.Overall.Runs} runs";
         var parts = new List<string>
         {
-            $"{report.Overall.Runs} runs · {Format.WinLoss(report.Overall)} · {Format.Percent(report.Overall)}",
-            "solo runs only",
+            WinrateSession.Tab is ReportTab.Cards or ReportTab.Relics
+                ? $"{runs} · {Format.Percent(report.Overall)}"
+                : $"{runs} · {Format.WinLoss(report.Overall)} · {Format.Percent(report.Overall)}",
         };
         if (RunArchive.UnreadableFiles > 0)
             parts.Add($"{RunArchive.UnreadableFiles} file(s) could not be read");
@@ -596,7 +700,6 @@ internal sealed class WinrateScreen : IDisposable
         frame.OffsetRight = 760f;
         frame.OffsetTop = FilterRowTop;
         frame.OffsetBottom = FilterRowTop + FilterRowHeight;
-        _filterFrame = frame;
         frame.GrowHorizontal = Control.GrowDirection.Both;
         frame.GrowVertical = Control.GrowDirection.Both;
 
@@ -611,15 +714,46 @@ internal sealed class WinrateScreen : IDisposable
         backdrop.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         frame.AddChild(backdrop);
 
-        var row = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Pass };
-        row.AddThemeConstantOverride("separation", 8);
-        row.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        // One row, left to right: the run filters, then — on the pick tabs only — a
+        // divider and the two that narrow the list, then the archive's own summary pushed
+        // against the right-hand edge. The second row this replaced cost a focus row, a
+        // hundred pixels of table, and three constants that had to move together.
+        var row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Pass };
+        row.AddThemeConstantOverride("separation", FilterSeparation);
         row.AddChild(_filters.Root);
         row.AddChild(_pickFilters.Root);
+        row.AddChild(new Control
+        {
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+        });
         row.AddChild(_summary);
-        frame.AddChild(row);
+
+        var inset = new MarginContainer { MouseFilter = Control.MouseFilterEnum.Pass };
+        inset.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        inset.AddThemeConstantOverride("margin_left", FilterPaddingX);
+        inset.AddThemeConstantOverride("margin_right", FilterPaddingX);
+        inset.AddThemeConstantOverride("margin_top", FilterPaddingTop);
+        inset.AddThemeConstantOverride("margin_bottom", FilterPaddingBottom);
+        inset.AddChild(row);
+        frame.AddChild(inset);
         return frame;
     }
+
+    private const int FilterSeparation = 14;
+    private const int FilterPaddingX = 22;
+    private const int FilterPaddingTop = 12;
+    private const int FilterPaddingBottom = 14;
+
+    /// <summary>
+    /// Why the numbers on the right are what they are. It was a line of text under the
+    /// filters; as a tip it costs no height and says the same thing to anyone who wonders.
+    /// </summary>
+    private const string CoopNote =
+        "Solo runs only — co-op runs are left out. A shared win is not the same evidence "
+        + "about your play as a solo one.";
+
+    private const float SummaryTipWidth = 470f;
 
     /// <summary>
     /// Raise the point at which scrolled content dissolves, so it disappears above the
@@ -687,32 +821,19 @@ internal sealed class WinrateScreen : IDisposable
     }
 
     /// <summary>
-    /// Fit the screen around however many filter rows the open tab needs.
+    /// Show the filters the open tab actually uses.
     ///
-    /// The pick tabs show a second row, which makes the header band taller;
-    /// the table below it and the scrollbar beside it both have to start lower or the band
-    /// draws over them. Three numbers move together, so they are set in one place.
+    /// This used to move three numbers together — the band's height, the content's top
+    /// margin, and the scrollbar's — because the pick tabs grew a second filter row and
+    /// everything below it had to drop out of the way. With every filter on one row there
+    /// is nothing to move: the band is one height on every tab, and the two arithmetic
+    /// mistakes that were possible here are gone with it.
     /// </summary>
     private void LayOutForTab()
     {
-        var showPicks = WinrateSession.Tab is ReportTab.Cards or ReportTab.Relics;
-        var extra = showPicks ? PickRowHeight : 0f;
-
-        _pickFilters.Root.Visible = showPicks;
-
-        if (_filterFrame.IsValid())
-            _filterFrame.OffsetBottom = FilterRowTop + FilterRowHeight + extra;
-
-        if (_contentInset is not null && _contentInset.IsValid())
-            _contentInset.AddThemeConstantOverride("margin_top", ContentMarginTop + (int)extra);
-
-        if (Scrollbar is { } scrollbar)
-        {
-            scrollbar.OffsetTop = FilterRowTop + FilterRowHeight + extra + ScrollbarGap;
-            scrollbar.CustomMinimumSize = new Vector2(
-                scrollbar.CustomMinimumSize.X,
-                Math.Max(0f, scrollbar.OffsetBottom - scrollbar.OffsetTop));
-        }
+        var tab = WinrateSession.Tab;
+        _pickFilters.Root.Visible = tab is ReportTab.Cards or ReportTab.Relics;
+        _filters.ShowCharacter(tab != ReportTab.Characters);
     }
 
     public void Dispose()

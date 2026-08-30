@@ -82,15 +82,20 @@ public class RunFilterTests
         Assert.Equal("Silent", Assert.Single(runs).Character);
     }
 
+    /// <summary>
+    /// The default names no ascension. Which one to open on is a fact about the archive —
+    /// the highest actually played — and <c>FilterBar</c> selects it once the runs are in.
+    /// Hard-coding one here would show a player who is not on it an empty screen.
+    /// </summary>
     [Fact]
-    public void The_default_filter_is_ascension_ten_solo_and_no_rerolls()
+    public void The_default_filter_is_solo_and_no_rerolls_at_every_ascension()
     {
         var runs = RunFilter.Default.Apply(Archive);
 
-        Assert.Equal(3, runs.Count);
+        Assert.Null(RunFilter.Default.Ascension);
+        Assert.Contains(runs, run => run.Ascension != 10);
         Assert.All(runs, run =>
         {
-            Assert.Equal(10, run.Ascension);
             Assert.Equal(1, run.PlayerCount);
             Assert.False(run.IsEarlyAbandon);
         });

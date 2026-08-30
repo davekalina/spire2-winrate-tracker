@@ -17,6 +17,8 @@
     <Compile Include="..\WinrateTrackerCode\WinrateReport.cs" Link="WinrateReport.cs" />
     <Compile Include="..\WinrateTrackerCode\Format.cs" Link="Format.cs" />
     <Compile Include="..\WinrateTrackerCode\ReportTables.cs" Link="ReportTables.cs" />
+    <Compile Include="..\WinrateTrackerCode\HomePanel.cs" Link="HomePanel.cs" />
+    <Compile Include="..\WinrateTrackerCode\ArtKey.cs" Link="ArtKey.cs" />
     <Compile Include="..\WinrateTrackerCode\GameData.cs" Link="GameData.cs" />
     <Compile Include="..\WinrateTrackerCode\PickFilter.cs" Link="PickFilter.cs" />
 

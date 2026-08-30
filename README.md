@@ -1,27 +1,40 @@
 # Winrate Tracker
 
 A Slay the Spire 2 mod that reads your own run history and reports how often you actually
-win — over time, and split by month, by patch, by run block, and by character.
+win — lately, and split by month, by patch, by run block, and by character.
 
 It adds a **Win Rates** tile to the Compendium, beside Statistics and Run History.
 
-![Overview](images/01-WinrateTracker-Overview.jpg)
+![Home](images/01-WinrateTracker-Overview.jpg)
 
 ## What it does
 
-Five tabs — an **Overview** with your record, streaks and a rolling win rate; **Splits**,
-which cuts the same archive up several ways and will graph any of them; **Characters**,
-per character and over recent runs; and **Cards** and **Relics**, ranking everything you
-have picked up by how often the runs that took it went on to win. A filter row narrows the
-whole screen by ascension, character, and time window, and the pick tabs add a minimum and
-a rarity of their own.
+Five tabs.
+
+**Home** answers "how am I doing lately" without scrolling: your last fifty runs as the
+headline figure, a trend chart behind it, the last ten runs one by one — hover any of them
+for the whole run — and each character's recent form beside the others. Pressing a
+character narrows the whole screen to them.
+
+**Splits** cuts the same archive up by month, by patch and in fifty-run blocks, and will
+graph any of them, with two more tables for time of day. **Characters** compares the five
+against each other. **Cards** and **Relics** rank everything you have picked up by how
+often the runs that took it went on to win.
+
+Every table that reports a win rate draws it against your own average, so a number is
+always a comparison rather than a figure on its own.
+
+One filter row narrows the whole screen by ascension, character and time window; the pick
+tabs add a minimum and a rarity on the end of the same row. It opens on the highest
+ascension you have played.
 
 The numbers come from the `.run` files the game already writes for every finished run, so
 nothing needs enabling first and runs from before you installed the mod are included.
 Reading them happens off the main thread and is cached, so the screen opens without a
 stutter.
 
-Everything works with mouse and keyboard or with a gamepad.
+Everything works with mouse and keyboard or with a gamepad, and every filter is a single
+stop on the pad.
 
 ## Installing
 

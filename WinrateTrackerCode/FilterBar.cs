@@ -1,4 +1,5 @@
 using Godot;
+using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
 
 namespace WinrateTracker.WinrateTrackerCode;
 
@@ -7,50 +8,111 @@ namespace WinrateTracker.WinrateTrackerCode;
 /// to look. It applies to every tab.
 ///
 /// Options come from the archive itself, so the ascension list only offers ascensions that
-/// have actually been played.
+/// have actually been played and the character list only characters that have been played.
 /// </summary>
 internal sealed class FilterBar
 {
     /// <summary>
-    /// Windows offered, in order. Null is the whole archive. A user-specified window is
-    /// not here yet — it needs a number entry, which this row has no room for.
+    /// Windows offered, in order. Null is the whole archive. Written short — <c>30d</c>, not
+    /// <c>Last 30 days</c> — because the box's own caption already says what the number
+    /// means, and a filter row that fits on one line is the point of the boxes.
+    ///
+    /// A window the player types is still not here: it needs a number entry, which this row
+    /// has no room for and the game has no native control for.
     /// </summary>
     private static readonly (string Text, int? Days)[] Windows =
     [
         ("All", null),
-        ("Last 7 days", 7),
-        ("Last 14 days", 14),
-        ("Last 30 days", 30),
-        ("Last 45 days", 45),
-        ("Last 60 days", 60),
-        ("Last 90 days", 90),
-        ("Last 120 days", 120),
+        ("7d", 7),
+        ("14d", 14),
+        ("30d", 30),
+        ("45d", 45),
+        ("60d", 60),
+        ("90d", 90),
+        ("120d", 120),
     ];
 
-    private readonly PaginatorRow _row = new();
-    private readonly PaginatorRow.Cycler _ascension;
-    private readonly PaginatorRow.Cycler _character;
-    private readonly PaginatorRow.Cycler _window;
+    private const string AllText = "All";
 
-    public FilterBar()
+    private readonly HBoxContainer _row;
+    private readonly ComboBox _ascension;
+    private readonly ComboBox _character;
+    private readonly ComboBox _window;
+
+    /// <summary>
+    /// Whether the player has chosen an ascension for themselves.
+    ///
+    /// Until they have, the screen picks the highest one in the archive — most people who
+    /// open this mod sit on one ascension and want that one. After they have, their choice
+    /// stands, including through a background reload that would otherwise quietly put them
+    /// back on the highest.
+    /// </summary>
+    private bool _ascensionChosen;
+
+    public FilterBar(Control host)
     {
-        _ascension = _row.Add("Ascension");
-        _character = _row.Add("Character");
-        _window = _row.Add("Time window");
+        _row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Pass };
+        _row.AddThemeConstantOverride("separation", Separation);
 
-        // Publish first: the screen's handler reads the filter this writes.
-        _row.Changed += Publish;
-        _row.Changed += () => Changed?.Invoke();
+        _ascension = Add(host, "Ascension");
+        _character = Add(host, "Character");
+        _window = Add(host, "Window");
+
+        _ascension.Changed += () => _ascensionChosen = true;
+        foreach (var combo in Combos)
+        {
+            // Publish first: the screen's handler reads the filter this writes.
+            combo.Changed += Publish;
+            combo.Changed += () => Changed?.Invoke();
+        }
+
         Rebuild();
     }
 
-    public Control Root => _row.Root;
+    private const int Separation = 14;
 
-    public List<Control> Controls => _row.Controls;
+    private ComboBox Add(Control host, string caption)
+    {
+        var combo = new ComboBox(host, caption);
+        _row.AddChild(combo.Root);
+        return combo;
+    }
 
-    public void FocusFirst() => _row.FocusFirst();
+    private IEnumerable<ComboBox> Combos => [_ascension, _character, _window];
 
-    /// <summary>Raised after the player pages any control. The screen rebuilds its report.</summary>
+    public Control Root => _row;
+
+    /// <summary>
+    /// The row's focus stops, left to right — one per filter, which is the reason these are
+    /// combo boxes rather than the arrow pairs they replaced.
+    /// </summary>
+    public List<Control> Controls =>
+        Combos.Where(combo => combo.Root.Visible).Select(combo => combo.Root).ToList();
+
+    public void FocusFirst() => Controls.FirstOrDefault()?.TryGrabFocus();
+
+    /// <summary>Close whatever list is open. The screen calls this when the tab changes.</summary>
+    public void Close()
+    {
+        foreach (var combo in Combos)
+            combo.Close();
+    }
+
+    /// <summary>
+    /// Hide the character filter on the tab that is already a comparison between characters.
+    /// Narrowing to one there would leave a table of a single row.
+    /// </summary>
+    public void ShowCharacter(bool visible)
+    {
+        // Closed before it is hidden: a list left open on a control that has just gone
+        // invisible would still be on screen, still holding cancel, with nothing to
+        // dismiss it back to.
+        if (!visible)
+            _character.Close();
+        _character.Root.Visible = visible;
+    }
+
+    /// <summary>Raised after the player commits a filter. The screen rebuilds its report.</summary>
     public event Action? Changed;
 
     /// <summary>
@@ -61,26 +123,43 @@ internal sealed class FilterBar
     public void Rebuild()
     {
         var filter = WinrateSession.Filter;
+        var ascensions = RunArchive.KnownAscensions();
 
+        // Highest first, so "the one I play" is at the top of the list as well as selected.
         _ascension.SetOptions(
-            RunArchive.KnownAscensions().Select(ascension => new PaginatorRow.Option($"Ascension {ascension}", ascension)).Prepend(new PaginatorRow.Option("All", null)),
-            filter.Ascension);
+            ascensions
+                .Select(ascension => new ComboBox.Option(Format.Count(ascension), ascension))
+                .Prepend(new ComboBox.Option(AllText, null)),
+            _ascensionChosen || !RunArchive.HasLoaded
+                ? filter.Ascension
+                : ascensions.Count > 0 ? ascensions[0] : null);
 
         _character.SetOptions(
-            RunArchive.KnownCharacters().Select(character => new PaginatorRow.Option(character, character)).Prepend(new PaginatorRow.Option("All", null)),
+            RunArchive.KnownCharacters()
+                .Select(character => new ComboBox.Option(character, character, ArtKey.Character(character)))
+                .Prepend(new ComboBox.Option(AllText, null)),
             filter.Character);
 
         _window.SetOptions(
-            Windows.Select(window => new PaginatorRow.Option(window.Text, window.Days)),
+            Windows.Select(window => new ComboBox.Option(window.Text, window.Days)),
             filter.WindowDays);
 
         // Only write the selection back once the archive is in. Before then the option
         // lists hold nothing but "All", so publishing would quietly overwrite the
         // remembered ascension with the only value that happens to be selectable yet.
         // Afterwards it is worth doing, because a remembered ascension or character that
-        // is no longer in the archive really has fallen back to "All".
+        // is no longer in the archive really has fallen back to "All" — and because the
+        // ascension picked for the player above has to reach the filter.
         if (RunArchive.HasLoaded)
             Publish();
+    }
+
+    /// <summary>Set the character filter from somewhere else — the Home chips do this.</summary>
+    public void SelectCharacter(string? character)
+    {
+        WinrateSession.Filter = WinrateSession.Filter with { Character = character };
+        Rebuild();
+        Changed?.Invoke();
     }
 
     private void Publish() =>
