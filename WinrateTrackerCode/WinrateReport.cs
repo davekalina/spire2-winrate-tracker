@@ -54,15 +54,16 @@ internal sealed record PeriodRow(
 /// One character's record, all-time and over its own most recent runs.
 ///
 /// <paramref name="RecentRuns" /> is the same ten runs as <paramref name="Last10" />, kept
-/// one by one and oldest first, because the pip strip shows the shape of the streak and
-/// not just how it totalled.
+/// whole and oldest first. The pip strip shows the shape of the streak rather than just how
+/// it totalled — and every pip on this screen can be hovered for the run behind it, which
+/// needs the run and not a win-or-loss flag.
 /// </summary>
 internal sealed record CharacterRow(
     string Character,
     Tally All,
     Tally Last10,
     Tally Last50,
-    IReadOnlyList<bool> RecentRuns);
+    IReadOnlyList<RunRecord> RecentRuns);
 
 /// <summary>
 /// One stretch of runs as the Home trend plots it: the block's own win rate as a bar, and
@@ -409,16 +410,15 @@ internal sealed record WinrateReport
         Tally.Of(Slice(runs, Math.Max(0, runs.Count - count), Math.Min(count, runs.Count)));
 
     /// <summary>
-    /// How the last few runs went, one by one and oldest first. A pip strip shows whether
-    /// four wins out of ten were four in a row or four scattered, which the tally cannot.
+    /// The last few runs, whole and oldest first. A pip strip shows whether four wins out
+    /// of ten were four in a row or four scattered, which the tally cannot — and each pip
+    /// is hoverable for the run it stands for.
     /// </summary>
-    private static IReadOnlyList<bool> RecentOutcomesOf(IReadOnlyList<RunRecord> runs) =>
+    private static IReadOnlyList<RunRecord> RecentOutcomesOf(IReadOnlyList<RunRecord> runs) =>
         Slice(
-                runs,
-                Math.Max(0, runs.Count - RecentRunsPerCharacter),
-                Math.Min(RecentRunsPerCharacter, runs.Count))
-            .Select(run => run.Win)
-            .ToList();
+            runs,
+            Math.Max(0, runs.Count - RecentRunsPerCharacter),
+            Math.Min(RecentRunsPerCharacter, runs.Count));
 
     private static List<PeriodRow> MonthsOf(IReadOnlyList<RunRecord> runs) =>
         PeriodsOf(

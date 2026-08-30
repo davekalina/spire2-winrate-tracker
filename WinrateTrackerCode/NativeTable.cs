@@ -201,7 +201,7 @@ internal static class NativeTable
         for (var i = 0; i < section.Columns.Count; i++)
         {
             var source = i < cells.Count ? cells[i] : Format.Empty;
-            var cell = BuildCell(source, section.Columns[i], partWidths[i], iconSize);
+            var cell = BuildCell(source, section.Columns[i], partWidths[i], iconSize, tip);
             cell.CustomMinimumSize = new Vector2(widths[i], cell.CustomMinimumSize.Y);
             cell.SizeFlagsHorizontal = i == 0 ? Control.SizeFlags.ExpandFill : Control.SizeFlags.Fill;
             row.AddChild(cell);
@@ -240,10 +240,10 @@ internal static class NativeTable
             follow: true);
     }
 
-    private static Control BuildCell(TableCell cell, TableColumn column, float[] partWidths, float iconSize)
+    private static Control BuildCell(TableCell cell, TableColumn column, float[] partWidths, float iconSize, HoverTip? tip)
     {
         if (cell.Pips is { } pips)
-            return PipStrip(pips);
+            return PipStrip(pips, tip);
 
         if (column.Bar is { } spec)
             return NativeStyle.ComparisonBar(cell.Bar, spec);
@@ -317,16 +317,25 @@ internal static class NativeTable
         return row;
     }
 
-    private static Control PipStrip(IReadOnlyList<bool> pips)
+    /// <summary>
+    /// Ten runs as pips, each hoverable for the run behind it — the same readout Home gives
+    /// its own strips.
+    /// </summary>
+    private static Control PipStrip(IReadOnlyList<RunSummary> pips, HoverTip? tip)
     {
         var row = new HBoxContainer
         {
-            MouseFilter = Control.MouseFilterEnum.Ignore,
+            MouseFilter = Control.MouseFilterEnum.Pass,
             SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
         };
         row.AddThemeConstantOverride("separation", PipGap);
-        foreach (var win in pips)
-            row.AddChild(NativeStyle.Pip(win, PipWidth, PipHeight, lettered: false));
+
+        foreach (var run in pips)
+        {
+            var pip = NativeStyle.Pip(run.Win, PipWidth, PipHeight, lettered: false);
+            RunTipView.Attach(tip, pip, run);
+            row.AddChild(pip);
+        }
         return row;
     }
 

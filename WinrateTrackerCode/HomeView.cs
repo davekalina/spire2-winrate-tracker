@@ -57,7 +57,9 @@ internal sealed class HomeView
     private const float ChipPipHeight = 9f;
     private const int ChipPipGap = 4;
 
-    private const float RunTipWidth = 440f;
+    /// <summary>The hit area around a chip pip. The mark itself is too thin to point at.</summary>
+    private const float ChipPipTargetHeight = 18f;
+
     private const float BarTipWidth = 300f;
     private const float TrendTipWidth = 470f;
 
@@ -190,9 +192,9 @@ internal sealed class HomeView
 
     /// <summary>
     /// The last ten runs as pips, oldest on the left. Each one is hoverable and reads out
-    /// the whole run, which is the only place on the screen a single run is visible at all.
+    /// the whole run — the same readout the character chips and the Characters table give.
     /// </summary>
-    private Control RunStrip(IReadOnlyList<HomeRun> runs)
+    private Control RunStrip(IReadOnlyList<RunSummary> runs)
     {
         var strip = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Pass };
         strip.AddThemeConstantOverride("separation", RunPipGap);
@@ -201,7 +203,7 @@ internal sealed class HomeView
         {
             var pip = NativeStyle.Pip(run.Win, RunPipSize, RunPipSize, lettered: true);
             var remembered = run;
-            _tip.Attach(pip, () => RunTip(remembered), RunTipWidth);
+            RunTipView.Attach(_tip, pip, remembered);
             strip.AddChild(pip);
         }
 
@@ -214,80 +216,6 @@ internal sealed class HomeView
         return spaced;
     }
 
-    /// <summary>
-    /// One run, read out: who, at what ascension, when, how long, and how it ended. The
-    /// ascension is badged over the character's own icon the way the game badges it on the
-    /// score screen, rather than spelled out in a line of its own.
-    /// </summary>
-    private static Control RunTip(HomeRun run)
-    {
-        var portrait = new Control
-        {
-            CustomMinimumSize = new Vector2(PortraitSize, PortraitSize),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
-        };
-        if (GameArt.Icon(ArtKey.Character(run.Character), PortraitSize) is { } icon)
-        {
-            icon.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-            portrait.AddChild(icon);
-        }
-
-        var badge = new Control
-        {
-            CustomMinimumSize = new Vector2(BadgeSize, BadgeSize),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-            AnchorLeft = 1f,
-            AnchorTop = 1f,
-            AnchorRight = 1f,
-            AnchorBottom = 1f,
-            OffsetLeft = -BadgeSize + BadgeOverhang,
-            OffsetTop = -BadgeSize + BadgeOverhang,
-            OffsetRight = BadgeOverhang,
-            OffsetBottom = BadgeOverhang,
-        };
-        if (GameArt.Icon(ArtKey.Ascension, BadgeSize) is { } flame)
-        {
-            flame.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-            badge.AddChild(flame);
-        }
-        var ascension = NativeStyle.Figure(Format.Count(run.Ascension), BadgeFontSize, NativeStyle.CellColor);
-        ascension.HorizontalAlignment = HorizontalAlignment.Center;
-        ascension.VerticalAlignment = VerticalAlignment.Center;
-        ascension.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        ascension.AddThemeColorOverride("font_shadow_color", new Color(0, 0, 0, 0.7f));
-        ascension.AddThemeConstantOverride("shadow_offset_x", 0);
-        ascension.AddThemeConstantOverride("shadow_offset_y", 2);
-        badge.AddChild(ascension);
-        portrait.AddChild(badge);
-
-        var length = HoverTip.Row(
-            8,
-            GameArt.IconSlot(ArtKey.Clock, ClockSize),
-            HoverTip.Line(run.Length, NativeStyle.CellColor));
-        length.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-
-        return HoverTip.Column(
-            HoverTip.Row(
-                14,
-                portrait,
-                HoverTip.Line(run.Character, NativeStyle.CellColor, 27, bold: true),
-                HoverTip.Spacer(),
-                HoverTip.Line(
-                    run.Win ? "WIN" : "LOSS",
-                    run.Win ? NativeStyle.GoodColor : NativeStyle.BadColor,
-                    BaselineFontSize,
-                    bold: true)),
-            HoverTip.Row(16, HoverTip.Line(run.When, NativeStyle.CellColor), length),
-            HoverTip.Line(run.Outcome, NativeStyle.CellColor with { A = 0.85f }),
-            HoverTip.Line(run.Detail, NativeStyle.ColumnHeaderColor, BaselineFontSize));
-    }
-
-    private const float PortraitSize = 52f;
-    private const float BadgeSize = 34f;
-    private const float BadgeOverhang = 8f;
-    private const int BadgeFontSize = 18;
-    private const float ClockSize = 26f;
 
     // ── the trend ────────────────────────────────────────────────────────────
 
@@ -648,19 +576,42 @@ internal sealed class HomeView
         ShadowSize = selected || lit ? 14 : 0,
     };
 
-    private static Control ChipPips(IReadOnlyList<bool> runs)
+    /// <summary>
+    /// A chip's ten runs as a segmented bar, each segment hoverable for the run it stands
+    /// for — the same readout the headline's pips give.
+    ///
+    /// Each segment is a target taller than the mark drawn inside it. The bar is nine pixels
+    /// high, which is right to look at and far too thin to point at.
+    /// </summary>
+    private Control ChipPips(IReadOnlyList<RunSummary> runs)
     {
-        var row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        var row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Pass };
         row.AddThemeConstantOverride("separation", ChipPipGap);
 
-        foreach (var win in runs)
-            row.AddChild(new ColorRect
+        foreach (var run in runs)
+        {
+            var target = new Control
             {
-                Color = win ? NativeStyle.GoodColor : NativeStyle.CellColor with { A = 0.18f },
-                CustomMinimumSize = new Vector2(0, ChipPipHeight),
+                CustomMinimumSize = new Vector2(0, ChipPipTargetHeight),
                 SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+                MouseFilter = Control.MouseFilterEnum.Stop,
+            };
+
+            var mark = new ColorRect
+            {
+                Color = run.Win ? NativeStyle.GoodColor : NativeStyle.CellColor with { A = 0.18f },
                 MouseFilter = Control.MouseFilterEnum.Ignore,
-            });
+                AnchorLeft = 0f,
+                AnchorRight = 1f,
+                AnchorTop = 0.5f,
+                AnchorBottom = 0.5f,
+                OffsetTop = -ChipPipHeight / 2f,
+                OffsetBottom = ChipPipHeight / 2f,
+            };
+            target.AddChild(mark);
+            RunTipView.Attach(_tip, target, run);
+            row.AddChild(target);
+        }
         return row;
     }
 

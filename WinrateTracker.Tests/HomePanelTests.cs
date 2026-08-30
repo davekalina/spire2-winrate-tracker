@@ -163,7 +163,9 @@ public class HomePanelTests
         Assert.Equal([Tone.Good, Tone.Neutral, Tone.Bad], chips.Select(chip => chip.LastTenTone));
         Assert.Equal("5-5", chips[0].LastTenRecord);
         Assert.Equal("5-5 · 50%", chips[0].LastFifty);
-        Assert.Equal([true, true, true, true, true, false, false, false, false, false], chips[0].RecentRuns);
+        Assert.Equal(
+            [true, true, true, true, true, false, false, false, false, false],
+            chips[0].RecentRuns.Select(run => run.Win));
     }
 
     /// <summary>
@@ -272,5 +274,31 @@ public class HomePanelTests
         Assert.Equal(
             "vs 12.0% all time",
             Panel(new string('L', 100) + new string('W', 18) + new string('L', 32)).RecentBaseline);
+    }
+
+    /// <summary>
+    /// Every pip on the screen is hoverable for the run behind it, so every strip has to
+    /// carry whole runs and not win-or-loss flags. The chips are the strip that is easiest
+    /// to reduce to a bar of colour and forget.
+    /// </summary>
+    [Fact]
+    public void A_chips_pips_carry_the_same_run_detail_the_headlines_pips_do()
+    {
+        var runs = new List<RunRecord>
+        {
+            Run(Unix(2026, 8, 24, 22), character: "Ironclad", ascension: 10,
+                killedBy: "Queen Boss", actReached: 3, nodes: 44, runTimeSeconds: 3480f),
+        };
+
+        var report = WinrateReport.Build(runs);
+        var chip = Assert.Single(HomePanel.Build(report, report.Characters, null).Characters);
+        var pip = Assert.Single(chip.RecentRuns);
+
+        Assert.Equal("Ironclad", pip.Character);
+        Assert.Equal(10, pip.Ascension);
+        Assert.Equal("2026-08-24 · 22:00", pip.When);
+        Assert.Equal("58 min", pip.Length);
+        Assert.Equal("Killed by Queen Boss", pip.Outcome);
+        Assert.Equal("Act 3 · 44 floors", pip.Detail);
     }
 }

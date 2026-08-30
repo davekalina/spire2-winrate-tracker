@@ -277,7 +277,9 @@ public class ReportTablesTests
         var pips = section.Rows[0][^1];
 
         Assert.Empty(pips.Parts);
-        Assert.Equal([false, false, true, true, false, true, false, false, false, true], pips.Pips!);
+        Assert.Equal(
+            [false, false, true, true, false, true, false, false, false, true],
+            pips.Pips!.Select(run => run.Win));
     }
 
     [Fact]

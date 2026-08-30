@@ -67,8 +67,11 @@ internal sealed record TableCell(IReadOnlyList<string> Parts)
     /// <summary>An <see cref="ArtKey" /> drawn before the text — a character or a rarity.</summary>
     public string? Icon { get; init; }
 
-    /// <summary>Ten runs as wins and losses, oldest first, drawn as pips instead of text.</summary>
-    public IReadOnlyList<bool>? Pips { get; init; }
+    /// <summary>
+    /// Ten runs, oldest first, drawn as pips instead of text. Whole runs rather than
+    /// win-or-loss flags, because each pip can be hovered for the run behind it.
+    /// </summary>
+    public IReadOnlyList<RunSummary>? Pips { get; init; }
 
     /// <summary>
     /// The real thing this row is about — a card or a relic — for the renderer to have the
@@ -321,7 +324,7 @@ internal static class ReportTables
                 // The bar reads the recent rate, not the career one: the question the row
                 // is asking is how this character is going now.
                 new TableCell([]) { Bar = row.Last50.Runs == 0 ? null : row.Last50.WinRate },
-                new TableCell([]) { Pips = row.RecentRuns },
+                new TableCell([]) { Pips = row.RecentRuns.Select(RunSummary.Of).ToList() },
             ]).ToList());
 
         // One column per character, its record and rate paired inside it.

@@ -31,14 +31,36 @@ internal enum Tone
 /// <param name="Length">How long the run took, e.g. <c>58 min</c>.</param>
 /// <param name="Outcome">What ended it — <c>Killed by Queen Boss</c>, or <c>Run won</c>.</param>
 /// <param name="Detail">How far it got, e.g. <c>Act 3 · 44 floors</c>.</param>
-internal sealed record HomeRun(
+internal sealed record RunSummary(
     bool Win,
     string Character,
     int Ascension,
     string When,
     string Length,
     string Outcome,
-    string Detail);
+    string Detail)
+{
+    /// <summary>
+    /// One run, reduced to what a hover tip reads out.
+    ///
+    /// Shared rather than built per caller: the same tip appears under the Home headline's
+    /// pips, under each character chip's, and in the Characters table's last-ten column, and
+    /// three of them phrasing a run three ways would be three bugs waiting.
+    /// </summary>
+    public static RunSummary Of(RunRecord run) => new(
+        run.Win,
+        run.Character,
+        run.Ascension,
+        $"{Format.Date(run.LocalStart)} · {run.LocalStart:HH:mm}",
+        $"{Format.Minutes(run.RunTimeMinutes)} min",
+        run.Win ? "Run won" : $"Killed by {Fallback(run.KilledBy, "something unrecorded")}",
+        run.Win
+            ? $"Act 3 cleared · {run.Nodes} floors"
+            : $"Act {run.ActReached} · {run.Nodes} floors");
+
+    private static string Fallback(string value, string ifEmpty) =>
+        string.IsNullOrWhiteSpace(value) ? ifEmpty : value;
+}
 
 /// <summary>One bar of the Home trend, with the tip that belongs to it.</summary>
 /// <param name="Height">The bar's share of the plot, 0 to 1, against the chart's ceiling.</param>
@@ -67,7 +89,7 @@ internal sealed record HomeCharacter(
     string Character,
     string LastTenRecord,
     Tone LastTenTone,
-    IReadOnlyList<bool> RecentRuns,
+    IReadOnlyList<RunSummary> RecentRuns,
     string LastFifty,
     bool Selected);
 
@@ -101,7 +123,7 @@ internal sealed record HomePanel(
     string RecentDelta,
     Tone RecentDeltaTone,
     string RecentBaseline,
-    IReadOnlyList<HomeRun> RecentRuns,
+    IReadOnlyList<RunSummary> RecentRuns,
     HomeTrend? Trend,
     IReadOnlyList<HomeCharacter> Characters,
     IReadOnlyList<HomeStat> Stats)
@@ -138,7 +160,7 @@ internal sealed record HomePanel(
             // Whatever the rate on the right is the rate *over*, in the same words the
             // column tips use. Under a 30-day window it is not the all-time rate.
             report.HasRecentWindow ? $"vs {Format.Percent(report.Overall)} {report.Scope}" : report.Scope,
-            report.RecentRuns.Select(RunOf).ToList(),
+            report.RecentRuns.Select(RunSummary.Of).ToList(),
             TrendOf(report.Trend),
             characterRuns.Select(row => CharacterOf(row, selectedCharacter)).ToList(),
             StatsOf(report));
@@ -146,20 +168,6 @@ internal sealed record HomePanel(
 
     private static Tone ToneOf(double delta) =>
         delta > 0d ? Tone.Good : delta < 0d ? Tone.Bad : Tone.Neutral;
-
-    private static HomeRun RunOf(RunRecord run) => new(
-        run.Win,
-        run.Character,
-        run.Ascension,
-        $"{Format.Date(run.LocalStart)} · {run.LocalStart:HH:mm}",
-        $"{Format.Minutes(run.RunTimeMinutes)} min",
-        run.Win ? "Run won" : $"Killed by {Fallback(run.KilledBy, "something unrecorded")}",
-        run.Win
-            ? $"Act 3 cleared · {run.Nodes} floors"
-            : $"Act {run.ActReached} · {run.Nodes} floors");
-
-    private static string Fallback(string value, string ifEmpty) =>
-        string.IsNullOrWhiteSpace(value) ? ifEmpty : value;
 
     /// <summary>
     /// A chip's colour follows its last ten rather than its career: five or more wins is
@@ -171,7 +179,7 @@ internal sealed record HomePanel(
         row.Last10.Wins >= GoodLastTen ? Tone.Good
             : row.Last10.Wins >= FairLastTen ? Tone.Neutral
             : Tone.Bad,
-        row.RecentRuns,
+        row.RecentRuns.Select(RunSummary.Of).ToList(),
         $"{Format.WinLoss(row.Last50)} · {Format.WholePercent(row.Last50)}",
         string.Equals(row.Character, selected, StringComparison.Ordinal));
 
