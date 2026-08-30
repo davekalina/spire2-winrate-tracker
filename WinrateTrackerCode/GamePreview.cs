@@ -1,4 +1,5 @@
 using Godot;
+using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Cards;
@@ -120,7 +121,19 @@ internal static class GamePreview
             return null;
         }
 
-        Populate(card, () => card.Model = Mutable(model));
+        Populate(card, () =>
+        {
+            card.Model = Mutable(model);
+            // Reload — which the setter above runs — only draws the art: the portrait, the
+            // frame, the type plaque. The title and the description are written by
+            // UpdateVisuals, and without this call the card keeps the two lines its scene
+            // ships with, which is why it read "Broken Card" over the right picture.
+            //
+            // PileType.None because the card is in no pile, and CardPreviewMode.None
+            // because previews are the numbers a card would deal given the powers in play,
+            // and there is no combat here to ask.
+            card.UpdateVisuals(PileType.None, CardPreviewMode.None);
+        });
         tip.MouseFilter = Control.MouseFilterEnum.Ignore;
         return tip;
     }

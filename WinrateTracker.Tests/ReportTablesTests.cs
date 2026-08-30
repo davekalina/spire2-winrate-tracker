@@ -393,15 +393,17 @@ public class ReportTablesTests
         var cards = Assert.Single(ReportTables.Build(ReportTab.Cards, WinrateReport.Build(runs)));
 
         Assert.Null(cards.Rows[0][0].Icon);
+        Assert.Null(cards.Rows[0][1].Icon);
         Assert.False(cards.HasArt);
     }
 
     /// <summary>
-    /// The icon rides with the name, not with the rarity word. It is a picture of what the
-    /// row is about; beside the rarity it was labelling a label.
+    /// Where the rarity icon sits depends on what else the row has to show. A card has no
+    /// art small enough to recognise, so the rarity icon leads its name. A relic brings its
+    /// own art, which takes that place, and the rarity icon goes back beside the rarity word.
     /// </summary>
     [Fact]
-    public void A_pick_row_carries_its_icon_and_its_preview_on_the_name()
+    public void A_pick_row_puts_its_rarity_icon_where_the_row_has_room_for_it()
     {
         var runs = new List<RunRecord>
         {
@@ -414,13 +416,14 @@ public class ReportTablesTests
             var card = Assert.Single(ReportTables.Build(ReportTab.Cards, WinrateReport.Build(runs))).Rows[0];
             Assert.Equal("rarity/cards/rare", card[0].Icon);
             Assert.Equal("card/SHIV", card[0].Preview);
-            // The rarity column is words alone now.
             Assert.Equal("Rare", card[1].Text);
             Assert.Null(card[1].Icon);
 
             var relic = Assert.Single(ReportTables.Build(ReportTab.Relics, WinrateReport.Build(runs))).Rows[0];
-            Assert.Equal("rarity/relics/shop", relic[0].Icon);
+            Assert.Null(relic[0].Icon);
             Assert.Equal("relic/KUNAI", relic[0].Preview);
+            Assert.Equal("Shop", relic[1].Text);
+            Assert.Equal("rarity/relics/shop", relic[1].Icon);
         }
         finally
         {

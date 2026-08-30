@@ -403,17 +403,20 @@ internal static class ReportTables
             ],
             picks.Select(pick => (IReadOnlyList<TableCell>)
             [
-                // The icon rides with the name, not with the rarity word beside it. It is a
-                // picture of what the row is about, and the row is about a card — the rarity
-                // column already says the rarity in words, and an icon there was labelling a
-                // label. The rarity list in the filter still carries it, where it is the only
-                // thing distinguishing one option from another at a glance.
+                // Where the rarity icon goes depends on what else is in the row. A card has
+                // no art small enough to recognise, so its rarity icon leads the name and is
+                // the only picture there. A relic brings its own art, which takes that place
+                // — so the rarity icon goes back beside the rarity word, where the two of
+                // them say one thing together.
                 new TableCell([nameOf(pick.Id)])
                 {
-                    Icon = ArtKey.Rarity(table, pick.Rarity),
+                    Icon = cards ? ArtKey.Rarity(table, pick.Rarity) : null,
                     Preview = cards ? ArtKey.CardPreview(pick.Id) : ArtKey.RelicPreview(pick.Id),
                 },
-                pick.Rarity,
+                new TableCell([pick.Rarity])
+                {
+                    Icon = cards ? null : ArtKey.Rarity(table, pick.Rarity),
+                },
                 Format.Count(pick.Tally.Runs),
                 Format.WinLoss(pick.Tally),
                 Format.Percent(pick.Tally),
