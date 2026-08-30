@@ -35,10 +35,17 @@ internal sealed class WinrateScreen : IDisposable
     private const int ContentMarginLeft = 250;
 
     /// <summary>
-    /// Right inset. Sized to clear the scrollbar, which the scene anchors 567 px right of
-    /// centre — so the content has to stop by about 1500 in the reference frame.
+    /// Right inset, equal to the left one.
+    ///
+    /// It used to be wider, to leave the scrollbar alone where the scene anchors it. That
+    /// bought clearance at the price of an off-centre screen: the tab row above is centred
+    /// on the viewport, and a content column inset 250 on one side and 420 on the other sits
+    /// 85 px left of it, which reads as everything being slightly wrong rather than as a
+    /// deliberate margin. The scrollbar moves instead — see
+    /// <see cref="LiftContentBelowFilters" /> — and the column is symmetric, centred under
+    /// the tabs, and exactly the 1420 the design was drawn against.
     /// </summary>
-    private const int ContentMarginRight = 420;
+    private const int ContentMarginRight = ContentMarginLeft;
 
     /// <summary>Clears the tab row and the filter row above it.</summary>
     private const int ContentMarginTop = 250;
@@ -250,22 +257,43 @@ internal sealed class WinrateScreen : IDisposable
     }
 
     /// <summary>
-    /// Start the tables and the scroll track below the filter band. One height on every
-    /// tab now that every filter fits on one row, so this is set once rather than per tab.
+    /// Start the tables and the scroll track below the filter band, and move the track out
+    /// from over the content.
+    ///
+    /// The scene anchors the scrollbar 567 px right of centre, which suits its own
+    /// two-column screen. This one's content column is the full width the design asks for,
+    /// and runs under that. Rather than narrowing the column — which pushed it off centre —
+    /// the track moves outboard of it, into the margin the screen has spare on that side.
+    ///
+    /// One height and one position on every tab, now that every filter fits on one row, so
+    /// this is set once rather than recomputed per tab.
     /// </summary>
     private void LiftContentBelowFilters()
     {
         if (_contentInset is not null && _contentInset.IsValid())
             _contentInset.AddThemeConstantOverride("margin_top", ContentMarginTop);
 
-        if (Scrollbar is { } scrollbar)
-        {
-            scrollbar.OffsetTop = FilterRowTop + FilterRowHeight + ScrollbarGap;
-            scrollbar.CustomMinimumSize = new Vector2(
-                scrollbar.CustomMinimumSize.X,
-                Math.Max(0f, scrollbar.OffsetBottom - scrollbar.OffsetTop));
-        }
+        if (Scrollbar is not { } scrollbar)
+            return;
+
+        var width = scrollbar.OffsetRight - scrollbar.OffsetLeft;
+        scrollbar.OffsetLeft = ScrollbarLeft;
+        scrollbar.OffsetRight = ScrollbarLeft + width;
+        scrollbar.OffsetTop = FilterRowTop + FilterRowHeight + ScrollbarGap;
+        scrollbar.CustomMinimumSize = new Vector2(
+            scrollbar.CustomMinimumSize.X,
+            Math.Max(0f, scrollbar.OffsetBottom - scrollbar.OffsetTop));
     }
+
+    /// <summary>
+    /// Where the scroll track sits, measured from the screen's centre the way the scene
+    /// anchors it. Just clear of the content column's right edge, which is
+    /// <c>960 - ContentMarginRight</c> from that same centre.
+    /// </summary>
+    private const float ScrollbarLeft = (ReferenceWidth / 2f) - ContentMarginRight + ScrollbarGap;
+
+    /// <summary>The screen's design width, the frame every offset above is measured in.</summary>
+    private const float ReferenceWidth = 1920f;
 
     /// <summary>
     /// The gear, at the end of the tab row. The same settings are in Settings → Mod
@@ -585,9 +613,8 @@ internal sealed class WinrateScreen : IDisposable
             // to one there would leave a table of a single row. Its control is hidden, and
             // the filter it holds is genuinely not applied rather than silently applied
             // behind a hidden control.
-            var report = WinrateReport.Build(
-                (tab == ReportTab.Characters ? filter with { Character = null } : filter)
-                .Apply(RunArchive.Runs));
+            var scoped = tab == ReportTab.Characters ? filter with { Character = null } : filter;
+            var report = WinrateReport.Build(scoped.Apply(RunArchive.Runs)) with { Scope = scoped.Scope };
 
             _summary.SetTextAutoSize(SummaryText(report));
             // Which rarities exist depends on the runs in view, so the pick filter's own

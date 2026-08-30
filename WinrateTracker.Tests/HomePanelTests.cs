@@ -247,4 +247,30 @@ public class HomePanelTests
         Assert.Equal("3 losses", streak.Value);
         Assert.Equal(Tone.Bad, streak.ValueTone);
     }
+
+    /// <summary>
+    /// Under a time window the figures are not all-time figures, and the screen must not say
+    /// they are. One phrase, from the filter, used by the headline and the column tips alike.
+    /// </summary>
+    [Fact]
+    public void A_time_window_renames_what_the_comparison_is_against()
+    {
+        var runs = Sequence(new string('L', 100) + new string('W', 50), Start);
+        var windowed = new RunFilter { WindowDays = 30 };
+        var report = WinrateReport.Build(runs) with { Scope = windowed.Scope };
+
+        var panel = HomePanel.Build(report, report.Characters, null);
+
+        Assert.Equal("in the last 30 days", windowed.Scope);
+        Assert.Equal("vs 33.3% in the last 30 days", panel.RecentBaseline);
+    }
+
+    [Fact]
+    public void Without_a_window_the_comparison_is_all_time()
+    {
+        Assert.Equal("all time", RunFilter.Default.Scope);
+        Assert.Equal(
+            "vs 12.0% all time",
+            Panel(new string('L', 100) + new string('W', 18) + new string('L', 32)).RecentBaseline);
+    }
 }

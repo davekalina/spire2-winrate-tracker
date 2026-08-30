@@ -188,44 +188,38 @@ internal static class NativeTable
 
         for (var i = 0; i < section.Columns.Count; i++)
         {
-            var cell = BuildCell(
-                i < cells.Count ? cells[i] : Format.Empty,
-                section.Columns[i],
-                partWidths[i],
-                iconSize);
+            var source = i < cells.Count ? cells[i] : Format.Empty;
+            var cell = BuildCell(source, section.Columns[i], partWidths[i], iconSize);
             cell.CustomMinimumSize = new Vector2(widths[i], cell.CustomMinimumSize.Y);
             cell.SizeFlagsHorizontal = i == 0 ? Control.SizeFlags.ExpandFill : Control.SizeFlags.Fill;
             row.AddChild(cell);
+            AttachPreview(cell, source.Preview, tip);
         }
 
         panel.AddChild(row);
-        AttachPreview(panel, cells, tip);
         return panel;
     }
 
     /// <summary>
-    /// Let the whole row show the card or relic it is about.
+    /// Let the name show the card or relic behind it.
     ///
-    /// The row rather than the name alone: the row is what the eye is tracking across to
-    /// read the numbers, and having the picture appear only over the first column would
-    /// mean losing it exactly when you look at the figure you came for.
+    /// The name alone, not the whole row. A card is 300 px of picture and the rows are 33 px
+    /// apart, so a row-wide target means the card is up whenever the cursor is anywhere in
+    /// the table — including over the numbers it is covering. Held to the name, it appears
+    /// when you point at the thing it is a picture of.
     ///
-    /// Only rows that have something to show listen at all. A card the model database has
+    /// Only cells that have something to show listen at all. A card the model database has
     /// never heard of — a mod's card in an old run file, say — leaves the row inert rather
     /// than opening an empty frame under the cursor.
     /// </summary>
-    private static void AttachPreview(Control row, IReadOnlyList<TableCell> cells, HoverTip? tip)
+    private static void AttachPreview(Control cell, string? key, HoverTip? tip)
     {
-        if (tip is null)
-            return;
-
-        var key = cells.Select(cell => cell.Preview).FirstOrDefault(preview => preview is not null);
-        if (key is null || !GamePreview.Exists(key))
+        if (tip is null || key is null || !GamePreview.Exists(key))
             return;
 
         var cards = key.StartsWith(ArtKey.CardPreviewPrefix, StringComparison.Ordinal);
         tip.Attach(
-            row,
+            cell,
             () => GamePreview.Of(key) ?? new Control(),
             cards ? CardPreviewWidth : GamePreview.RelicWidth,
             // The card arrives already framed, in the game's own border.

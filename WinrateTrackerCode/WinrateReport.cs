@@ -131,6 +131,13 @@ internal sealed record WinrateReport
     public required Tally Overall { get; init; }
 
     /// <summary>
+    /// What <see cref="Overall" /> covers, in words. Set by the screen from the filter that
+    /// produced the runs; see <see cref="RunFilter.Scope" />. Defaulted rather than required
+    /// because most callers build a report from a list they have already narrowed.
+    /// </summary>
+    public string Scope { get; init; } = RunFilter.EverySince;
+
+    /// <summary>
     /// The last <see cref="RecentWindow" /> runs, or all of them if there are fewer. The
     /// Home headline: what the archive says about how the player is going now rather than
     /// how they have gone since they started.

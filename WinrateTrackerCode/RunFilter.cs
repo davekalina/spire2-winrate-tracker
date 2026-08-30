@@ -19,6 +19,9 @@ internal sealed record RunFilter
     /// <summary>An abandon below this floor is a reroll. Floor 1 only.</summary>
     public const int EarlyAbandonFloor = 2;
 
+    /// <summary>How <see cref="Scope" /> reads when no window is set.</summary>
+    public const string EverySince = "all time";
+
     /// <summary>Ascension to report on, or null for every ascension together.</summary>
     public int? Ascension { get; init; }
 
@@ -51,6 +54,20 @@ internal sealed record RunFilter
     /// who is on A4 an empty screen until they found the control.
     /// </summary>
     public static RunFilter Default { get; } = new();
+
+    /// <summary>
+    /// What the figures under this filter actually cover, in words — <c>all time</c>, or
+    /// <c>in the last 30 days</c>.
+    ///
+    /// Every comparison on the screen is against the player's own rate, and that rate is
+    /// whatever this filter leaves. Under a window it is not the all-time rate and must not
+    /// claim to be: a 30-day rate labelled "all time" is the screen saying something false
+    /// about the very number it is drawing the bars against.
+    ///
+    /// Phrased to sit at the end of a sentence, so one string serves the Home headline and
+    /// the column tips both.
+    /// </summary>
+    public string Scope => WindowDays is { } days ? $"in the last {days} days" : EverySince;
 
     public bool Matches(RunRecord run) =>
         run.PlayerCount <= 1

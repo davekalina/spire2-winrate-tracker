@@ -35,14 +35,17 @@ internal sealed class FilterBar
     ];
 
     /// <summary>
-    /// The ascension filter keeps its caption: on its own, "10" is a number with no subject.
-    /// The other two do not — "All Characters" and "30 days" say what they are.
+    /// No filter on this row carries a caption. Each one's values say what they are —
+    /// "A10", "All Characters", "30 days" — and a word in front of them was width spent
+    /// repeating what the value already said.
+    ///
+    /// Ascension held out longest, because a bare "10" is a number with no subject. The
+    /// answer was to write the value properly rather than to label it: the game itself
+    /// says A10.
     /// </summary>
-    private const string AscensionCaption = "Ascension";
-
     private const string NoCaption = "";
 
-    private const string AllAscensions = "All";
+    private const string AllAscensions = "All Ascensions";
     private const string AllCharacters = "All Characters";
 
     private readonly HBoxContainer _row;
@@ -65,7 +68,7 @@ internal sealed class FilterBar
         _row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Pass };
         _row.AddThemeConstantOverride("separation", Separation);
 
-        _ascension = Add(host, AscensionCaption);
+        _ascension = Add(host, NoCaption);
         _character = Add(host, NoCaption);
         _window = Add(host, NoCaption);
 
@@ -139,7 +142,7 @@ internal sealed class FilterBar
         // Highest first, so "the one I play" is at the top of the list as well as selected.
         _ascension.SetOptions(
             ascensions
-                .Select(ascension => new ComboBox.Option(Format.Count(ascension), ascension))
+                .Select(ascension => new ComboBox.Option($"A{ascension}", ascension))
                 .Prepend(new ComboBox.Option(AllAscensions, null)),
             _ascensionChosen || !RunArchive.HasLoaded
                 ? filter.Ascension

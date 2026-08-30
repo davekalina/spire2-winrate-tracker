@@ -28,7 +28,14 @@ internal sealed class PickFilterBar
     /// </summary>
     private static readonly int[] Minimums = [1, 2, 3, 5, 10, 20, 50];
 
-    private const string AnyRarityText = "All";
+    /// <summary>
+    /// Neither of these carries a caption. Their values say what they are — "2+ Picks",
+    /// "All Rarities", "Common" — and the word in front was width spent on nothing. The
+    /// same rule the run filters follow; see <see cref="FilterBar" />.
+    /// </summary>
+    private const string NoCaption = "";
+
+    private const string AnyRarityText = "All Rarities";
     private const int Separation = 14;
 
     private readonly HBoxContainer _row;
@@ -49,8 +56,8 @@ internal sealed class PickFilterBar
             MouseFilter = Control.MouseFilterEnum.Ignore,
         });
 
-        _minimum = Add(host, "Min picks");
-        _rarity = Add(host, "Rarity");
+        _minimum = Add(host, NoCaption);
+        _rarity = Add(host, NoCaption);
 
         foreach (var combo in Combos)
         {
@@ -109,8 +116,12 @@ internal sealed class PickFilterBar
 
     private static bool ShowingRelics => WinrateSession.Tab == ReportTab.Relics;
 
+    /// <summary>
+    /// The word "Picks" rides with the number, because the control has no caption to carry
+    /// it: "2+" on its own beside a rarity is a number about nothing in particular.
+    /// </summary>
     private static string MinimumText(int minimum) =>
-        minimum == 1 ? "Any" : $"{minimum}+";
+        minimum == 1 ? "Any # of Picks" : $"{minimum}+ Picks";
 
     private static IEnumerable<ComboBox.Option> RarityOptions(IReadOnlyList<PickRow> picks, string table) =>
         PickFilter.RaritiesIn(picks)

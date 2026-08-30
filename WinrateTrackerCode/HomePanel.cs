@@ -135,7 +135,9 @@ internal sealed record HomePanel(
             // against the all-time rate would be the figure compared with itself.
             report.HasRecentWindow ? Format.Signed(delta * 100d, 1) : "",
             ToneOf(delta),
-            report.HasRecentWindow ? $"vs {Format.Percent(report.Overall)} all time" : "all time",
+            // Whatever the rate on the right is the rate *over*, in the same words the
+            // column tips use. Under a 30-day window it is not the all-time rate.
+            report.HasRecentWindow ? $"vs {Format.Percent(report.Overall)} {report.Scope}" : report.Scope,
             report.RecentRuns.Select(RunOf).ToList(),
             TrendOf(report.Trend),
             characterRuns.Select(row => CharacterOf(row, selectedCharacter)).ToList(),

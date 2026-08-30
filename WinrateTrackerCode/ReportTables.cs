@@ -160,14 +160,14 @@ internal static class ReportTables
     /// in the heading because a bar with an unlabelled notch is a comparison against
     /// nothing.
     /// </summary>
-    private static TableColumn ComparisonColumn(double allTimeRate, float width) =>
-        new($"vs your avg {Format.Percent(allTimeRate)}")
+    private static TableColumn ComparisonColumn(double rate, string scope, float width) =>
+        new($"vs your avg {Format.Percent(rate)}")
         {
-            Bar = new BarSpec(allTimeRate, ComparisonScale),
+            Bar = new BarSpec(rate, ComparisonScale),
             MinWidth = width,
             Tooltip =
                 $"Bars run from zero on a 0–{Format.WholePercent(ComparisonScale)} scale, "
-                + $"with the notch at your {Format.Percent(allTimeRate)} all-time rate. "
+                + $"with the notch at your own rate {scope}: {Format.Percent(rate)}. "
                 + "Longer than the notch means that period beat your average.",
         };
 
@@ -211,13 +211,14 @@ internal static class ReportTables
             return [];
 
         var rate = report.Overall.WinRate;
+        var scope = report.Scope;
         return
         [
             // The month is the date, so a from and a to beside it say nothing the label
             // has not already said.
-            PeriodSection("By month", report.Months, "month", rate, withFloors: true, withDates: false),
-            PeriodSection("By patch", report.Patches, "patch", rate),
-            PeriodSection("50-run blocks", report.Blocks50, "block", rate),
+            PeriodSection("By month", report.Months, "month", rate, scope, withFloors: true, withDates: false),
+            PeriodSection("By patch", report.Patches, "patch", rate, scope),
+            PeriodSection("50-run blocks", report.Blocks50, "block", rate, scope),
             GroupSection("By time of day", report.TimeOfDay, "time") with
             {
                 Beside = GroupSection("Every 4 hours", report.HourBlocks, "hours"),
@@ -250,7 +251,8 @@ internal static class ReportTables
         string title,
         IReadOnlyList<PeriodRow> periods,
         string labelHeader,
-        double allTimeRate,
+        double rate,
+        string scope,
         bool withFloors = false,
         bool withDates = true)
     {
@@ -262,7 +264,7 @@ internal static class ReportTables
         }
         columns.Add(new TableColumn("record", RightAligned: true));
         columns.Add(new TableColumn("win%", RightAligned: true));
-        columns.Add(ComparisonColumn(allTimeRate, PeriodBarWidth));
+        columns.Add(ComparisonColumn(rate, scope, PeriodBarWidth));
         columns.Add(new TableColumn("cumulative%", RightAligned: true));
         if (withFloors)
             columns.Add(new TableColumn("avg floors", RightAligned: true));
@@ -308,7 +310,7 @@ internal static class ReportTables
                 new TableColumn("runs", RightAligned: true),
                 new TableColumn("all time", RightAligned: true),
                 new TableColumn("last 50", RightAligned: true),
-                ComparisonColumn(report.Overall.WinRate, PeriodBarWidth),
+                ComparisonColumn(report.Overall.WinRate, report.Scope, PeriodBarWidth),
                 new TableColumn("last 10") { MinWidth = PipStripWidth },
             ],
             report.Characters.Select(row => (IReadOnlyList<TableCell>)
@@ -373,6 +375,7 @@ internal static class ReportTables
             cards ? GameData.CardName : GameData.RelicName,
             cards ? GameData.Cards : GameData.Relics,
             report.Overall.WinRate,
+            report.Scope,
             cards);
 
         // Runs from before the mod could read decks, a run filter that leaves only such
@@ -386,7 +389,8 @@ internal static class ReportTables
         IReadOnlyList<PickRow> picks,
         Func<string, string> nameOf,
         string table,
-        double allTimeRate,
+        double rate,
+        string scope,
         bool cards) =>
         new(
             "",
@@ -396,7 +400,7 @@ internal static class ReportTables
                 new TableColumn("picked", RightAligned: true),
                 new TableColumn("record", RightAligned: true),
                 new TableColumn("win%", RightAligned: true),
-                SignedComparisonColumn(allTimeRate),
+                SignedComparisonColumn(rate, scope),
             ],
             picks.Select(pick => (IReadOnlyList<TableCell>)
             [
@@ -425,13 +429,13 @@ internal static class ReportTables
     /// track spans the whole 0-100% so the notch sits where the rate actually is, and a
     /// near-average pick draws nearly nothing — which is the truth about it.
     /// </summary>
-    private static TableColumn SignedComparisonColumn(double allTimeRate) =>
-        new($"vs your avg {Format.Percent(allTimeRate)}")
+    private static TableColumn SignedComparisonColumn(double rate, string scope) =>
+        new($"vs your avg {Format.Percent(rate)}")
         {
-            Bar = new BarSpec(allTimeRate, 1.0d, Signed: true),
+            Bar = new BarSpec(rate, 1.0d, Signed: true),
             MinWidth = PickBarWidth,
             Tooltip =
-                $"Bars run from your {Format.Percent(allTimeRate)} all-time rate: right when a pick "
+                $"Bars run from your own rate {scope} — {Format.Percent(rate)} — right when a pick "
                 + "beat it, left when it did not. A near-average pick draws almost nothing.",
         };
 }

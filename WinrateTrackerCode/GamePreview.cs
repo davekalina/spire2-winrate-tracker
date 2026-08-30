@@ -120,7 +120,12 @@ internal static class GamePreview
             return null;
         }
 
-        card.Ready += () => card.Model = model;
+        // A mutable instance, never the canonical template. The database hands out
+        // immutable models, and a card node given one draws the game's own "Broken Card —
+        // if you can read this, there is a bug" placeholder rather than the card. This is
+        // the same conversion the game's own CardHoverTip does for the same reason.
+        var instance = model.IsMutable ? model : model.ToMutable();
+        card.Ready += () => card.Model = instance;
         tip.MouseFilter = Control.MouseFilterEnum.Ignore;
         return tip;
     }
@@ -142,32 +147,44 @@ internal static class GamePreview
         relic.CustomMinimumSize = new Vector2(RelicIconSize, RelicIconSize);
         relic.MouseFilter = Control.MouseFilterEnum.Ignore;
         relic.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        relic.Ready += () => relic.Model = model;
+        var instance = model.IsMutable ? model : model.ToMutable();
+        relic.Ready += () => relic.Model = instance;
 
         column.AddChild(HoverTip.Row(
             14,
             relic,
             HoverTip.Line(GameData.RelicName(id), NativeStyle.CellColor, RelicNameFontSize, bold: true)));
 
-        var body = HoverTip.TextWidth(RelicWidth);
+        // The description only. Flavour text is a line of atmosphere, and for the relics
+        // the game has not finished it is a red "details will be revealed in the future"
+        // placeholder that reads as a fault in this screen rather than in the relic.
         if (Text(model.DynamicDescription) is { } description)
-            column.AddChild(HoverTip.Paragraph(description, NativeStyle.CellColor, body, RelicBodyFontSize));
-        if (Text(model.Flavor) is { } flavour)
-            column.AddChild(HoverTip.Paragraph(flavour, NativeStyle.ColumnHeaderColor, body, RelicBodyFontSize));
+            column.AddChild(HoverTip.Paragraph(
+                description, NativeStyle.CellColor, HoverTip.TextWidth(RelicWidth), RelicBodyFontSize));
 
         return column;
     }
 
     /// <summary>
-    /// A localised string's text, or null when the table has nothing under that key. The
-    /// game strips its own markup at draw time; here the raw text is close enough, and a
-    /// relic whose description will not resolve simply shows its name.
+    /// A localised string as words.
+    ///
+    /// Two passes, and both are needed. <c>GetFormattedText</c> resolves the game's own
+    /// template holes — <c>{Cards:plural:card|cards}</c> and friends — which the raw text
+    /// leaves standing; then the colour tags come out, because those are BBCode for the
+    /// game's rich-text label and this tip measures its own wrapping. Showing the raw string
+    /// put "[blue]{Cards}[/blue]" on screen, which reads as a broken mod.
+    ///
+    /// Null when the table has nothing under the key, and a relic whose description will not
+    /// resolve simply shows its name.
     /// </summary>
     private static string? Text(MegaCrit.Sts2.Core.Localization.LocString? line)
     {
         try
         {
-            var text = line?.GetRawText();
+            var text = line?.GetFormattedText();
+            if (string.IsNullOrWhiteSpace(text))
+                return null;
+            text = Markup.Replace(text, string.Empty).Trim();
             return string.IsNullOrWhiteSpace(text) ? null : text;
         }
         catch
@@ -175,4 +192,11 @@ internal static class GamePreview
             return null;
         }
     }
+
+    /// <summary>
+    /// A BBCode tag: <c>[blue]</c>, <c>[/blue]</c>, <c>[img=32]</c>. Deliberately not a
+    /// general HTML-ish matcher — it must not eat a square bracket a relic's own text uses.
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex Markup =
+        new(@"\[/?[a-zA-Z][^\[\]]*\]", System.Text.RegularExpressions.RegexOptions.Compiled);
 }
