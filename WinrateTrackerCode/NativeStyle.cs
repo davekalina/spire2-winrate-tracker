@@ -364,6 +364,12 @@ internal static class NativeStyle
     private const int BylineFontSize = 17;
 
     /// <summary>
+    /// The body font, for the one control that draws its own text rather than being handed
+    /// a label to draw: the search field's <see cref="LineEdit" />.
+    /// </summary>
+    public static Font BodyFont => Regular;
+
+    /// <summary>
     /// A column heading: small, dim, and in caps with the glyph spacing opened up.
     ///
     /// Caps rather than a rule or a background. A heading has to read as a different kind of

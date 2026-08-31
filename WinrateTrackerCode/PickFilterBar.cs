@@ -41,6 +41,7 @@ internal sealed class PickFilterBar
     private readonly HBoxContainer _row;
     private readonly ComboBox _minimum;
     private readonly ComboBox _rarity;
+    private readonly SearchBox _search;
 
     public PickFilterBar(Control host)
     {
@@ -59,11 +60,20 @@ internal sealed class PickFilterBar
         _minimum = Add(host, NoCaption);
         _rarity = Add(host, NoCaption);
 
+        // Last on the row, after the two that narrow by kind: rarity and a minimum are
+        // choices from a short list, and a name is the thing you fall back to when neither
+        // of those is what you knew about the card.
+        _search = new SearchBox(ComboBox.Height);
+        _row.AddChild(_search.Root);
+
         foreach (var combo in Combos)
         {
             combo.Changed += Publish;
             combo.Changed += () => Changed?.Invoke();
         }
+
+        _search.Changed += Publish;
+        _search.Changed += () => Changed?.Invoke();
     }
 
     private const float DividerHeight = 34f;
@@ -79,7 +89,15 @@ internal sealed class PickFilterBar
 
     public Control Root => _row;
 
-    public List<Control> Controls => Combos.Select(combo => combo.Root).ToList();
+    public List<Control> Controls =>
+        Combos.Select(combo => combo.Root).Append(_search.Root).ToList();
+
+    /// <summary>
+    /// Forget a search when the tab changes. The two tabs are different lists, and a name
+    /// typed for one usually matches nothing in the other — which reads as an empty tab
+    /// rather than as a filter still being applied.
+    /// </summary>
+    public void ClearSearch() => _search.Clear();
 
     public void Close()
     {
@@ -107,6 +125,8 @@ internal sealed class PickFilterBar
         _rarity.SetOptions(
             RarityOptions(relics ? report.Relics : report.Cards, table),
             relics ? filter.RelicRarity : filter.CardRarity);
+
+        _search.SetPlaceholder(relics ? "Search relics" : "Search cards");
 
         // The selection can move when a list shrinks — a rarity that is no longer on screen
         // really has fallen back to All — so what the control now reads has to be written
@@ -143,6 +163,7 @@ internal sealed class PickFilterBar
             MinimumPicks = _minimum.Selected as int? ?? 1,
             CardRarity = ShowingRelics ? current.CardRarity : rarity,
             RelicRarity = ShowingRelics ? rarity : current.RelicRarity,
+            Search = _search.Text,
         };
     }
 }

@@ -571,6 +571,7 @@ internal sealed class WinrateScreen : IDisposable
         // holding cancel, pointed at options that no longer belong to anything.
         _filters.Close();
         _pickFilters.Close();
+        _pickFilters.ClearSearch();
         _tip.Hide();
 
         WinrateSession.Tab = tab;

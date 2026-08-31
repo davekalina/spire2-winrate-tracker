@@ -30,17 +30,36 @@ internal sealed record PickFilter
 
     public string RelicRarity { get; init; } = AnyRarity;
 
+    /// <summary>
+    /// Narrows to picks whose name contains this, ignoring case. Empty shows everything.
+    ///
+    /// Matched against the name the table displays rather than the id it stores, because
+    /// the name is what the player is reading and what they will type at: nobody searches
+    /// for <c>RING_OF_THE_SNAKE</c>. It is shared by both tabs — they are never on screen
+    /// at once, and a name typed for one is rarely a name in the other, so the screen clears
+    /// it when the tab changes rather than carrying two.
+    /// </summary>
+    public string Search { get; init; } = "";
+
     public IReadOnlyList<PickRow> ApplyToCards(IReadOnlyList<PickRow> picks) =>
-        Apply(picks, CardRarity);
+        Apply(picks, CardRarity, GameData.CardName);
 
     public IReadOnlyList<PickRow> ApplyToRelics(IReadOnlyList<PickRow> picks) =>
-        Apply(picks, RelicRarity);
+        Apply(picks, RelicRarity, GameData.RelicName);
 
-    private IReadOnlyList<PickRow> Apply(IReadOnlyList<PickRow> picks, string rarity) =>
+    private IReadOnlyList<PickRow> Apply(
+        IReadOnlyList<PickRow> picks,
+        string rarity,
+        Func<string, string> nameOf) =>
         picks
             .Where(pick => pick.Tally.Runs >= MinimumPicks)
             .Where(pick => rarity == AnyRarity || string.Equals(pick.Rarity, rarity, StringComparison.Ordinal))
+            .Where(pick => Matches(nameOf(pick.Id)))
             .ToList();
+
+    private bool Matches(string name) =>
+        Search.Length == 0
+        || name.Contains(Search, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// The rarities actually present, weakest first, for the filter control to offer. Built from

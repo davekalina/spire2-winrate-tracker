@@ -64,4 +64,61 @@ public class PickFilterTests
         Assert.DoesNotContain(GameData.UnknownRarity, PickFilter.RaritiesIn(Picks));
         Assert.Contains(PickFilter.Default.ApplyToCards(Picks), pick => pick.Id == "MYSTERY");
     }
+
+    // ── search ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Matched against the name the table shows, not the id it stores. Nobody searches for
+    /// RING_OF_THE_SNAKE, and with no game assembly loaded the name falls back to the
+    /// tidied-up id — which is what these tests see, and still a name.
+    /// </summary>
+    [Fact]
+    public void A_search_narrows_to_names_that_contain_it()
+    {
+        var picks = new List<PickRow>
+        {
+            new("RING_OF_THE_SNAKE", "Rare", new Tally(4, 2)),
+            new("SHIV", "Common", new Tally(9, 3)),
+            new("SNAKE_OIL", "Uncommon", new Tally(6, 1)),
+        };
+
+        var found = new PickFilter { Search = "snake" }.ApplyToRelics(picks);
+
+        Assert.Equal(["Ring Of The Snake", "Snake Oil"], found.Select(pick => GameData.RelicName(pick.Id)));
+    }
+
+    [Fact]
+    public void A_search_ignores_case_and_surrounding_space()
+    {
+        var picks = new List<PickRow> { new("SHIV", "Common", new Tally(9, 3)) };
+
+        Assert.Single(new PickFilter { Search = "shiv" }.ApplyToCards(picks));
+        Assert.Single(new PickFilter { Search = "SHIV" }.ApplyToCards(picks));
+        Assert.Single(new PickFilter { Search = "hi" }.ApplyToCards(picks));
+        Assert.Empty(new PickFilter { Search = "shivv" }.ApplyToCards(picks));
+    }
+
+    [Fact]
+    public void An_empty_search_shows_everything()
+    {
+        Assert.Equal(Picks.Count, new PickFilter { Search = "" }.ApplyToCards(Picks).Count);
+        Assert.Equal(Picks.Count, PickFilter.Default.ApplyToCards(Picks).Count);
+    }
+
+    /// <summary>The search narrows alongside the other two, not instead of them.</summary>
+    [Fact]
+    public void A_search_stacks_with_the_rarity_and_the_minimum()
+    {
+        var picks = new List<PickRow>
+        {
+            new("SNAKE_RING", "Rare", new Tally(9, 3)),
+            new("SNAKE_OIL", "Common", new Tally(9, 3)),
+            new("SNAKE_EYES", "Rare", new Tally(1, 0)),
+        };
+
+        var found = new PickFilter { Search = "snake", CardRarity = "Rare", MinimumPicks = 2 }
+            .ApplyToCards(picks);
+
+        Assert.Equal("SNAKE_RING", Assert.Single(found).Id);
+    }
 }

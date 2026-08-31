@@ -28,21 +28,29 @@ namespace WinrateTracker.WinrateTrackerCode;
 /// </summary>
 internal sealed class ComboBox
 {
-    private const float Height = 48f;
-    private const int PaddingX = 15;
-    private const int Separation = 10;
-    private const float IconSize = 30f;
-    private const int CaptionFontSize = 19;
-    private const int ValueFontSize = 23;
+    /// <summary>
+    /// The row's measurements, a step down from the design's.
+    ///
+    /// The pick tabs carry five filters and a search field on one row, which the design
+    /// never had to fit. Everything here gives up two or three pixels so the field has
+    /// somewhere to be; at these sizes the row still reads as the same furniture.
+    /// </summary>
+    public const float Height = 44f;
+
+    private const int PaddingX = 13;
+    private const int Separation = 8;
+    private const float IconSize = 26f;
+    private const int CaptionFontSize = 17;
+    private const int ValueFontSize = 20;
 
     private const float ListMinWidth = 260f;
     private const float ListMaxHeight = 520f;
     private const float ListGap = 12f;
     private const int ListPaddingY = 6;
 
-    private const float OptionHeight = 50f;
+    private const float OptionHeight = 46f;
     private const int OptionPaddingX = 20;
-    private const int OptionFontSize = 24;
+    private const int OptionFontSize = 22;
     private const float OptionIconSize = 32f;
 
     /// <summary>What the back button listens for, and therefore what an open list must take over.</summary>
