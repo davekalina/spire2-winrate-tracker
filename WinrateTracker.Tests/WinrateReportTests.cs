@@ -31,6 +31,7 @@ public class WinrateReportTests
         Assert.Equal(0, report.Overall.Runs);
         Assert.Equal(0d, report.Overall.WinRate);
         Assert.Null(report.FirstRun);
+        Assert.Empty(report.Blocks10);
         Assert.Empty(report.Blocks50);
         Assert.Empty(report.Characters);
         Assert.Empty(report.Months);
@@ -169,7 +170,20 @@ public class WinrateReportTests
     {
         var report = Report("WLLWLWLLLWLLWLLLWLLWLLLW");
 
+        Assert.Equal(report.Overall.WinRate, report.Blocks10[0].CumulativeWinRate, 6);
         Assert.Equal(report.Overall.WinRate, report.Blocks50[0].CumulativeWinRate, 6);
+    }
+
+    /// <summary>Both block sizes exist and follow the same rules at their own size.</summary>
+    [Fact]
+    public void Ten_run_blocks_cut_the_same_archive_more_finely()
+    {
+        var report = Report(new string('L', 25));
+
+        Assert.Equal(3, report.Blocks10.Count);
+        Assert.Equal(["21-25", "11-20", "1-10"], report.Blocks10.Select(block => block.Label));
+        Assert.Equal(5, report.Blocks10[0].Tally.Runs);
+        Assert.Single(report.Blocks50);
     }
 
     // ── characters ───────────────────────────────────────────────────────────

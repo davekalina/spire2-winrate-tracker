@@ -178,7 +178,10 @@ internal sealed record WinrateReport
     public DateTime? FirstRun { get; init; }
     public DateTime? LastRun { get; init; }
 
-    /// <summary>50-run blocks, newest first, each carrying the all-time rate as of its end.</summary>
+    /// <summary>10-run blocks, newest first, each carrying the all-time rate as of its end.</summary>
+    public required IReadOnlyList<PeriodRow> Blocks10 { get; init; }
+
+    /// <summary>50-run blocks, newest first, on the same terms at a coarser size.</summary>
     public required IReadOnlyList<PeriodRow> Blocks50 { get; init; }
 
     /// <summary>Characters, best win rate first.</summary>
@@ -237,6 +240,7 @@ internal sealed record WinrateReport
             LongestWinStreak = LongestWinStreakOf(runs),
             FirstRun = runs.Count > 0 ? runs[0].LocalStart : null,
             LastRun = runs.Count > 0 ? runs[^1].LocalStart : null,
+            Blocks10 = BlocksOf(runs, 10),
             Blocks50 = BlocksOf(runs, 50),
             Characters = CharactersOf(runs),
             Months = months,

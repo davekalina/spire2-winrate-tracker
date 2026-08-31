@@ -81,29 +81,34 @@ public class ReportTablesTests
     // ── splits ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Splits_cuts_the_archive_four_ways_with_the_two_clock_tables_paired()
+    public void Splits_cuts_the_archive_five_ways_with_the_two_clock_tables_paired()
     {
         var sections = ReportTables.Build(ReportTab.Splits, Report("WL"));
 
         Assert.Equal(
-            ["By month", "By patch", "50-run blocks", "By time of day"],
+            ["By month", "By patch", "10-run blocks", "50-run blocks", "By time of day"],
             sections.Select(section => section.Title));
         // The two time-of-day tables are narrow and about one question, so they share a row.
         Assert.Equal("Every 4 hours", sections[^1].Beside?.Title);
-        Assert.All(sections.Take(3), section => Assert.Null(section.Beside));
+        Assert.All(sections.Take(4), section => Assert.Null(section.Beside));
         Assert.Equal("Jan 2026", sections[0].Rows[0][0].Text);
     }
 
     /// <summary>
-    /// 10-run blocks are gone: the Home trend covers that granularity, and a second table
-    /// saying the same thing at more length is a table nobody reads.
+    /// A block of exactly ten needs no win% column — the record is the rate with a zero
+    /// after it — but it still gets the comparison bar, because a bar is a comparison and a
+    /// record is not.
     /// </summary>
     [Fact]
-    public void Ten_run_blocks_are_no_longer_a_table()
+    public void Ten_run_blocks_drop_the_rate_column_and_keep_the_bar()
     {
-        Assert.DoesNotContain(
-            Sections(ReportTab.Splits, Report(new string('W', 60))),
-            section => section.Title.Contains("10-run"));
+        var ten = Section(ReportTab.Splits, Report(new string('W', 60)), "10-run blocks");
+        var fifty = Section(ReportTab.Splits, Report(new string('W', 60)), "50-run blocks");
+
+        Assert.DoesNotContain("win%", Headers(ten));
+        Assert.Contains("win%", Headers(fifty));
+        Assert.Contains(ten.Columns, column => column.Bar is not null);
+        Assert.All(ten.Rows, row => Assert.Equal(ten.Columns.Count, row.Count));
     }
 
     [Fact]

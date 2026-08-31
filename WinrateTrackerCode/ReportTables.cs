@@ -220,6 +220,10 @@ internal static class ReportTables
             // has not already said.
             PeriodSection("By month", report.Months, "month", rate, scope, withFloors: true, withDates: false),
             PeriodSection("By patch", report.Patches, "patch", rate, scope),
+            // Both block sizes. The ten-run table reads as recent form at a resolution the
+            // fifty-run one smooths away, and the Home trend — which plots the same
+            // stretches — is a shape rather than a table of numbers you can read across.
+            PeriodSection("10-run blocks", report.Blocks10, "block", rate, scope, withOwnRate: false),
             PeriodSection("50-run blocks", report.Blocks50, "block", rate, scope),
             GroupSection("By time of day", report.TimeOfDay, "time") with
             {
@@ -256,6 +260,7 @@ internal static class ReportTables
         double rate,
         string scope,
         bool withFloors = false,
+        bool withOwnRate = true,
         bool withDates = true)
     {
         List<TableColumn> columns = [new(labelHeader)];
@@ -265,7 +270,11 @@ internal static class ReportTables
             columns.Add(new TableColumn("to", RightAligned: true));
         }
         columns.Add(new TableColumn("record", RightAligned: true));
-        columns.Add(new TableColumn("win%", RightAligned: true));
+        // A block of exactly ten needs no win% column: the record is the rate with a zero
+        // after it. The bar beside it still draws, because a bar is a comparison and the
+        // record is not.
+        if (withOwnRate)
+            columns.Add(new TableColumn("win%", RightAligned: true));
         columns.Add(ComparisonColumn(rate, scope, PeriodBarWidth));
         columns.Add(new TableColumn("cumulative%", RightAligned: true));
         if (withFloors)
@@ -280,7 +289,8 @@ internal static class ReportTables
                 cells.Add(Format.ShortDate(period.To));
             }
             cells.Add(Format.WinLoss(period.Tally));
-            cells.Add(Format.WholePercent(period.Tally));
+            if (withOwnRate)
+                cells.Add(Format.WholePercent(period.Tally));
             cells.Add(new TableCell([]) { Bar = period.Tally.Runs == 0 ? null : period.Tally.WinRate });
             cells.Add(Format.Percent(period.CumulativeWinRate));
             if (withFloors)
