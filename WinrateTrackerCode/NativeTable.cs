@@ -184,12 +184,19 @@ internal static class NativeTable
         HoverTip? tip,
         bool striped)
     {
-        var panel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-        panel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
-        {
-            // Row zero is striped, so the alternation itself draws the line under the head.
-            BgColor = striped ? NativeStyle.ZebraColor : new Color(0, 0, 0, 0),
-        });
+        // Pass rather than Ignore, so the row can tell when the cursor is over it. Godot
+        // raises mouse_entered on a hovered control's ancestors too, which is what keeps the
+        // highlight steady as the cursor crosses cells that handle the mouse themselves — a
+        // card name with a preview on it, or a pip with a run behind it.
+        var panel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Pass };
+        panel.AddThemeStyleboxOverride("panel", RowBox(striped, hovered: false));
+
+        panel.Connect(
+            Control.SignalName.MouseEntered,
+            Callable.From(() => panel.AddThemeStyleboxOverride("panel", RowBox(striped, hovered: true))));
+        panel.Connect(
+            Control.SignalName.MouseExited,
+            Callable.From(() => panel.AddThemeStyleboxOverride("panel", RowBox(striped, hovered: false))));
 
         var row = new HBoxContainer
         {
@@ -277,6 +284,17 @@ internal static class NativeTable
         row.AddChild(label);
         return row;
     }
+
+    /// <summary>
+    /// A body row's background. Row zero is striped, so the alternation itself draws the
+    /// line under the head; the row under the cursor overrides both.
+    /// </summary>
+    private static StyleBoxFlat RowBox(bool striped, bool hovered) => new()
+    {
+        BgColor = hovered
+            ? NativeStyle.RowHoverColor
+            : striped ? NativeStyle.ZebraColor : new Color(0, 0, 0, 0),
+    };
 
     /// <summary>
     /// A relic's own icon, if this cell is about a relic. Cards have one too, but a card's

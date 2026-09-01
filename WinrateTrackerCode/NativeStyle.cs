@@ -160,6 +160,13 @@ internal static class NativeStyle
     /// </summary>
     public static readonly Color ZebraColor = new(1f, 1f, 1f, 0.045f);
 
+    /// <summary>
+    /// The row under the cursor. Brighter than the zebra stripe and applied to striped and
+    /// unstriped rows alike: the point is to mark one row out of the table, and a highlight
+    /// that changed shade depending on which row you were on would not.
+    /// </summary>
+    public static readonly Color RowHoverColor = new(1f, 1f, 1f, 0.10f);
+
     /// <summary>The empty part of a comparison bar's track.</summary>
     public static readonly Color TrackColor = new(1f, 1f, 1f, 0.06f);
 

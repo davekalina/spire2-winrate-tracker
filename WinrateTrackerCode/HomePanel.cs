@@ -207,7 +207,7 @@ internal sealed record HomePanel(
                 $"runs {block.Range}",
                 Format.WinLoss(block.Tally),
                 Format.WholePercent(block.Tally),
-                $"all-time here {Format.Percent(block.CumulativeWinRate)}")).ToList(),
+                $"cumulative {Format.Percent(block.CumulativeWinRate)}")).ToList(),
             [
                 $"Each bar is {chart.BlockRuns} runs and shows that block's own win rate.",
                 "The gold line is your all-time win rate as it stood at the end of each block.",

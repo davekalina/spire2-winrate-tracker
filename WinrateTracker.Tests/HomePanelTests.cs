@@ -143,7 +143,7 @@ public class HomePanelTests
         Assert.Equal("runs 51-100", bars[1].TipHeading);
         Assert.Equal("15-35", bars[1].TipRecord);
         Assert.Equal("30%", bars[1].TipRate);
-        Assert.Equal("all-time here 20.0%", bars[1].TipCumulative);
+        Assert.Equal("cumulative 20.0%", bars[1].TipCumulative);
     }
 
     // ── character chips ──────────────────────────────────────────────────────
