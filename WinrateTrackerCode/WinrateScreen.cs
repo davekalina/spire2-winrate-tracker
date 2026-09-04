@@ -704,12 +704,20 @@ internal sealed class WinrateScreen : IDisposable
             return "Reading run history…";
         if (RunArchive.FailureReason is { } failure)
             return failure;
-        // On the pick tabs the run filter is only half the story: the minimum and the
-        // rarity can empty the list on their own, and saying "no runs match" would send
-        // the player to the wrong control.
-        return WinrateSession.Tab is ReportTab.Cards or ReportTab.Relics
-            ? "Nothing picked matches these filters."
-            : "No runs match this filter.";
+        if (WinrateSession.Tab is not (ReportTab.Cards or ReportTab.Relics))
+            return "No runs match this filter.";
+
+        // On the pick tabs the run filter is only half the story: the search, the minimum
+        // and the rarity can each empty the list on their own, and "no runs match" would
+        // send the player to the wrong control.
+        //
+        // The search term is quoted back rather than merely mentioned. It is the one filter
+        // whose value the player cannot check at a glance — a mistyped or half-typed word
+        // looks like a word — so an empty table says exactly what it searched for.
+        var search = WinrateSession.Picks.Search;
+        return search.Length > 0
+            ? $"Nothing matching “{search}”."
+            : "Nothing picked matches these filters.";
     }
 
     /// <summary>

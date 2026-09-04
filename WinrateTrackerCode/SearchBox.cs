@@ -25,7 +25,18 @@ internal sealed class SearchBox
     private const int PaddingX = 14;
     private const float MinWidth = 230f;
 
+    /// <summary>
+    /// How long typing has to stop before the tables are rebuilt.
+    ///
+    /// Every keystroke used to redraw the whole tab, and on the Cards tab with no character
+    /// filter that is several hundred rows torn down and built again — for a search that is
+    /// about to change on the next letter anyway. Long enough to swallow a burst of typing,
+    /// short enough that finishing a word feels like it filtered as you typed.
+    /// </summary>
+    private const double SettleSeconds = 0.2d;
+
     private readonly LineEdit _field;
+    private readonly Godot.Timer _settle;
 
     public SearchBox(float height)
     {
@@ -50,9 +61,16 @@ internal sealed class SearchBox
         _field.AddThemeStyleboxOverride("normal", Box(lit: false));
         _field.AddThemeStyleboxOverride("focus", Box(lit: true));
 
+        // Rebuilding on a timer rather than on the keystroke. The rebuild is heavy enough
+        // on a long list to be felt while typing, and every intermediate letter produces a
+        // table nobody looks at.
+        _settle = new Godot.Timer { OneShot = true, WaitTime = SettleSeconds };
+        _settle.Connect(Godot.Timer.SignalName.Timeout, Callable.From(() => Changed?.Invoke()));
+        _field.AddChild(_settle);
+
         _field.Connect(
             LineEdit.SignalName.TextChanged,
-            Callable.From<string>(_ => Changed?.Invoke()));
+            Callable.From<string>(_ => _settle.Start()));
         _field.Connect(Control.SignalName.GuiInput, Callable.From<InputEvent>(OnInput));
     }
 
@@ -76,6 +94,17 @@ internal sealed class SearchBox
         if (!_field.IsValid() || _field.Text.Length == 0)
             return;
         _field.Text = "";
+        Settled();
+    }
+
+    /// <summary>
+    /// Rebuild now rather than on the timer. Emptying the field is not typing — there is no
+    /// next letter coming — and waiting to show the whole list back reads as a stall.
+    /// </summary>
+    private void Settled()
+    {
+        if (_settle.IsValid())
+            _settle.Stop();
         Changed?.Invoke();
     }
 
@@ -129,7 +158,7 @@ internal sealed class SearchBox
         _field.Unedit();
         _field.GetViewport()?.SetInputAsHandled();
         PlatformUtil.CloseVirtualKeyboard();
-        Changed?.Invoke();
+        Settled();
     }
 
     private void Open()
