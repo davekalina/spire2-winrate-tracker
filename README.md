@@ -9,7 +9,7 @@ It adds a **Win Rates** tile to the Compendium, beside Statistics and Run Histor
 
 ## What it does
 
-Five tabs — an **Overview** with your record, streaks and a rolling win rate; **Splits**,
+Five tabs — a **Home** with your record, streaks and a rolling win rate; **Splits**,
 which cuts the same archive up several ways and will graph any of them; **Characters**,
 per character and over recent runs; and **Cards** and **Relics**, ranking everything you
 have picked up by how often the runs that took it went on to win. A filter row narrows the
