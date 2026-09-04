@@ -36,3 +36,9 @@ workshop/content/
 # Written beside the uploader each time it runs. A transcript of a publish, not
 # something the repository needs.
 mod-uploader.log
+
+# Working folders for screenshots: raw captures and the .slay sources they are
+# composed from. The finished images live in images/ and workshop/previews/;
+# these are the material they were cut from and would be dead weight in a clone.
+images/Aug30-2026/
+images/Post-Redesign/

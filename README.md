@@ -5,7 +5,7 @@ win — over time, and split by month, by patch, by run block, and by character.
 
 It adds a **Win Rates** tile to the Compendium, beside Statistics and Run History.
 
-![Overview](images/01-WinrateTracker-Overview.jpg)
+![Home](images/01-HomeScreen.png)
 
 ## What it does
 
@@ -25,7 +25,8 @@ Everything works with mouse and keyboard or with a gamepad.
 
 ## Installing
 
-Subscribe on the [Steam Workshop][workshop]. Requires Slay the Spire 2 v0.110 or newer.
+Subscribe on the [Steam Workshop][workshop]. Requires Slay the Spire 2 v0.111 or newer,
+on the beta branch.
 
 ## Building
 
