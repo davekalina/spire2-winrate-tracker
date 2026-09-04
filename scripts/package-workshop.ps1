@@ -13,6 +13,9 @@
     The .pdb is deliberately excluded: it is a local debugging aid, not something
     subscribers need.
 
+    Also copies workshop/workshop-description.txt into workshop.json, so the page
+    text is edited as prose in a text file rather than escaped into JSON by hand.
+
     Nothing is uploaded. The command to run afterwards is printed at the end.
 
 .PARAMETER Configuration
@@ -75,6 +78,32 @@ if ($manifest.has_pck) {
     }
     Copy-Item -LiteralPath $pck -Destination $content
     Write-Host "  + $modId.pck"
+}
+
+# The Workshop page description lives in a text file a human edits; workshop.json
+# only carries it to the uploader. Copying it in here means the two can never drift,
+# and nobody has to hand-escape a page of prose into JSON.
+$descriptionPath = Join-Path $root 'workshop\workshop-description.txt'
+$workshopPath    = Join-Path $root 'workshop\workshop.json'
+# Wrapped because this runs *after* workshop/content has been wiped and re-staged:
+# an unguarded throw here (hand-edited JSON that no longer parses, say) would abort
+# packaging with nothing staged and the upload command never printed. A stale page
+# description is the lesser problem, so it warns and carries on.
+if ((Test-Path -LiteralPath $descriptionPath) -and (Test-Path -LiteralPath $workshopPath)) {
+    try {
+        $description = (Get-Content -LiteralPath $descriptionPath -Raw).TrimEnd()
+        $workshop = Get-Content -LiteralPath $workshopPath -Raw | ConvertFrom-Json -ErrorAction Stop
+        if ($workshop.PSObject.Properties.Name -notcontains 'description') {
+            $workshop | Add-Member -NotePropertyName description -NotePropertyValue ''
+        }
+        if ($workshop.description -ne $description) {
+            $workshop.description = $description
+            $workshop | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $workshopPath -Encoding utf8
+            Write-Host "  = workshop.json description updated from workshop-description.txt"
+        }
+    } catch {
+        Write-Warning "Could not sync workshop.json description: $($_.Exception.Message)"
+    }
 }
 
 $image = Join-Path $root 'workshop\image.png'
