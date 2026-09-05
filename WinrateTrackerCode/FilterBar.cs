@@ -4,7 +4,7 @@ using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
 namespace WinrateTracker.WinrateTrackerCode;
 
 /// <summary>
-/// The row that decides which runs the tables cover: ascension, character, and how far back
+/// The row that decides which runs the tables cover: player mode, ascension, character, and how far back
 /// to look. It applies to every tab.
 ///
 /// Options come from the archive itself, so the ascension list only offers ascensions that
@@ -49,6 +49,7 @@ internal sealed class FilterBar
     private const string AllCharacters = "All Characters";
 
     private readonly HBoxContainer _row;
+    private readonly ComboBox _mode;
     private readonly ComboBox _ascension;
     private readonly ComboBox _character;
     private readonly ComboBox _window;
@@ -68,6 +69,9 @@ internal sealed class FilterBar
         _row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Pass };
         _row.AddThemeConstantOverride("separation", Separation);
 
+        _mode = new ComboBox(host, NoCaption, listMinWidth: 120f);
+        _mode.Root.CustomMinimumSize = new Vector2(88f, ComboBox.Height);
+        _row.AddChild(_mode.Root);
         _ascension = Add(host, NoCaption);
         _character = Add(host, NoCaption);
         _window = Add(host, NoCaption);
@@ -83,7 +87,7 @@ internal sealed class FilterBar
         Rebuild();
     }
 
-    private const int Separation = 14;
+    private const int Separation = 8;
 
     private ComboBox Add(Control host, string caption)
     {
@@ -92,7 +96,7 @@ internal sealed class FilterBar
         return combo;
     }
 
-    private IEnumerable<ComboBox> Combos => [_ascension, _character, _window];
+    private IEnumerable<ComboBox> Combos => [_mode, _ascension, _character, _window];
 
     public Control Root => _row;
 
@@ -139,6 +143,13 @@ internal sealed class FilterBar
         var filter = WinrateSession.Filter;
         var ascensions = RunArchive.KnownAscensions();
 
+        _mode.SetOptions(
+        [
+            new ComboBox.Option("SP", PlayerMode.Singleplayer),
+            new ComboBox.Option("MP", PlayerMode.Multiplayer),
+            new ComboBox.Option("All", PlayerMode.All),
+        ], filter.Mode);
+
         // Highest first, so "the one I play" is at the top of the list as well as selected.
         _ascension.SetOptions(
             ascensions
@@ -179,6 +190,7 @@ internal sealed class FilterBar
     private void Publish() =>
         WinrateSession.Filter = new RunFilter
         {
+            Mode = _mode.Selected is PlayerMode mode ? mode : PlayerMode.Singleplayer,
             Ascension = _ascension.Selected as int?,
             Character = _character.Selected as string,
             WindowDays = _window.Selected as int?,

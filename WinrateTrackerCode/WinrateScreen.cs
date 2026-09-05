@@ -168,6 +168,12 @@ internal sealed class WinrateScreen : IDisposable
         _summary = NativeStyle.Figure("", NativeStyle.ColumnHeaderFontSize, NativeStyle.ColumnHeaderColor);
         _summary.HorizontalAlignment = HorizontalAlignment.Right;
         _summary.VerticalAlignment = VerticalAlignment.Center;
+        // Share the remaining row width with long filter values without pushing the
+        // summary past the band. Measure at the normal font size before shrinking it.
+        _summary.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        _summary.ClipText = true;
+        _summary.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+        _summary.Connect(Control.SignalName.Resized, Callable.From(FitSummary));
 
         _content = new VBoxContainer();
         _content.AddThemeConstantOverride("separation", NativeStyle.SectionSeparation);
@@ -549,9 +555,10 @@ internal sealed class WinrateScreen : IDisposable
         // so switching profiles changes it, and RunArchive empties its cache when it does.
         // Re-reading is cheap when nothing moved, because parsed runs are cached by file.
         var directory = RunArchive.ResolveHistoryDirectory();
+        var localPlayerIds = RunArchive.ResolveLocalPlayerIds();
         _ = Task.Run(async () =>
         {
-            await RunArchive.RefreshAsync(directory).ConfigureAwait(false);
+            await RunArchive.RefreshAsync(directory, localPlayerIds).ConfigureAwait(false);
             Callable.From(OnArchiveLoaded).CallDeferred();
         });
     }
@@ -618,6 +625,7 @@ internal sealed class WinrateScreen : IDisposable
             var report = WinrateReport.Build(scoped.Apply(RunArchive.Runs)) with { Scope = scoped.Scope };
 
             _summary.SetTextAutoSize(SummaryText(report));
+            FitSummary();
             // Which rarities exist depends on the runs in view, so the pick filter's own
             // options are refreshed before they are read.
             _pickFilters.Rebuild(report);
@@ -720,15 +728,27 @@ internal sealed class WinrateScreen : IDisposable
             : "Nothing picked matches these filters.";
     }
 
+    /// <summary>Keep the summary inside the row as filter values change width.</summary>
+    private void FitSummary()
+    {
+        try
+        {
+            if (!_summary.IsValid() || _summary.Size.X <= 0)
+                return;
+            var font = _summary.GetThemeFont("font");
+            var size = NativeStyle.ColumnHeaderFontSize;
+            while (size > 14 && font.GetStringSize(_summary.Text, fontSize: size).X > _summary.Size.X)
+                size--;
+            _summary.AddThemeFontSizeOverride("font_size", size);
+        }
+        catch (Exception exception)
+        {
+            MainFile.Logger.Warn($"Could not fit the run summary: {exception.Message}");
+        }
+    }
+
     /// <summary>
-    /// What the archive in view amounts to, on the right-hand end of the filter row.
-    ///
-    /// The same three figures on every tab, pick tabs included. They were shortened there
-    /// while the row was carrying a second row's worth of filters; it is not, and dropping
-    /// the record bought width nothing needed.
-    ///
-    /// An unreadable file is appended when there is one. That is news, and a run silently
-    /// missing from a win rate is worse than a win rate that admits what it left out.
+    /// The same archive totals on every tab, followed by the unreadable-file count.
     /// </summary>
     private static string SummaryText(WinrateReport report)
     {
@@ -781,11 +801,6 @@ internal sealed class WinrateScreen : IDisposable
         row.AddThemeConstantOverride("separation", FilterSeparation);
         row.AddChild(_filters.Root);
         row.AddChild(_pickFilters.Root);
-        row.AddChild(new Control
-        {
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-        });
         row.AddChild(_summary);
 
         var inset = new MarginContainer { MouseFilter = Control.MouseFilterEnum.Pass };
@@ -799,7 +814,7 @@ internal sealed class WinrateScreen : IDisposable
         return frame;
     }
 
-    private const int FilterSeparation = 14;
+    private const int FilterSeparation = 8;
     private const int FilterPaddingX = 22;
     private const int FilterPaddingTop = 12;
     private const int FilterPaddingBottom = 14;

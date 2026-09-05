@@ -31,7 +31,7 @@ public class RunFilterTests
     }
 
     [Fact]
-    public void Co_op_runs_are_always_excluded()
+    public void Co_op_runs_are_excluded_by_default()
     {
         Assert.DoesNotContain(AllAscensions.Apply(Archive), run => run.PlayerCount > 1);
     }
@@ -93,6 +93,7 @@ public class RunFilterTests
         var runs = RunFilter.Default.Apply(Archive);
 
         Assert.Null(RunFilter.Default.Ascension);
+        Assert.Equal(PlayerMode.Singleplayer, RunFilter.Default.Mode);
         Assert.Contains(runs, run => run.Ascension != 10);
         Assert.All(runs, run =>
         {

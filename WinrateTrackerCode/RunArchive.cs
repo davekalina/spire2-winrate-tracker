@@ -1,4 +1,5 @@
 using Godot;
+using MegaCrit.Sts2.Core.Platform;
 using MegaCrit.Sts2.Core.Saves;
 
 namespace WinrateTracker.WinrateTrackerCode;
@@ -59,6 +60,26 @@ internal static class RunArchive
         }
     }
 
+    /// <summary>Capture platform IDs on the main thread before the archive worker starts.</summary>
+    public static IReadOnlyDictionary<string, ulong> ResolveLocalPlayerIds()
+    {
+        var ids = new Dictionary<string, ulong>();
+        foreach (var platform in Enum.GetValues<PlatformType>())
+        {
+            try
+            {
+                if (platform == PlatformType.Steam && PlatformUtil.PrimaryPlatform != PlatformType.Steam)
+                    continue;
+                ids[platform.ToString().ToLowerInvariant()] = PlatformUtil.GetLocalPlayerId(platform);
+            }
+            catch (Exception exception)
+            {
+                MainFile.Logger.Warn($"Could not identify the local {platform} player: {exception.Message}");
+            }
+        }
+        return ids;
+    }
+
     /// <summary>
     /// Read anything new and republish <see cref="Runs" />.
     ///
@@ -66,12 +87,12 @@ internal static class RunArchive
     /// the directory twice.
     /// </summary>
     /// <param name="directory">From <see cref="ResolveHistoryDirectory" />, resolved on the main thread.</param>
-    public static async Task RefreshAsync(string? directory)
+    public static async Task RefreshAsync(string? directory, IReadOnlyDictionary<string, ulong> localPlayerIds)
     {
         await Gate.WaitAsync().ConfigureAwait(false);
         try
         {
-            Load(directory);
+            Load(directory, localPlayerIds);
         }
         finally
         {
@@ -82,18 +103,22 @@ internal static class RunArchive
 
     /// <summary>The directory the cache was filled from, so a profile switch is noticed.</summary>
     private static string? _loadedFrom;
+    private static IReadOnlyDictionary<string, ulong> _loadedPlayerIds = new Dictionary<string, ulong>();
 
-    private static void Load(string? directory)
+    private static void Load(string? directory, IReadOnlyDictionary<string, ulong> localPlayerIds)
     {
         // Each save profile has its own history directory. Switching profiles has to
         // empty the cache, or the new profile is shown the old one's runs — which looks
         // like the screen simply failing to update.
-        if (!string.Equals(_loadedFrom, directory, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(_loadedFrom, directory, StringComparison.OrdinalIgnoreCase)
+            || _loadedPlayerIds.Count != localPlayerIds.Count
+            || _loadedPlayerIds.Any(pair => !localPlayerIds.TryGetValue(pair.Key, out var id) || id != pair.Value))
         {
             Cache.Clear();
             UnreadableFiles = 0;
             Runs = [];
             _loadedFrom = directory;
+            _loadedPlayerIds = localPlayerIds;
         }
 
         if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory))
@@ -129,7 +154,9 @@ internal static class RunArchive
             RunRecord? record;
             try
             {
-                record = RunParser.Parse(name, File.ReadAllText(path));
+                record = RunParser.Parse(name, File.ReadAllText(path), localPlayerIds);
+                if (record is null)
+                    MainFile.Logger.Warn($"Could not parse run history file {name}: invalid run data or unidentified multiplayer player.");
             }
             catch (Exception exception)
             {

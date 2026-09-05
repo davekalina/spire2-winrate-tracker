@@ -1,5 +1,12 @@
 namespace WinrateTracker.WinrateTrackerCode;
 
+internal enum PlayerMode
+{
+    Singleplayer,
+    Multiplayer,
+    All,
+}
+
 /// <summary>
 /// Which runs the tables are built from.
 ///
@@ -8,11 +15,8 @@ namespace WinrateTracker.WinrateTrackerCode;
 /// win rate without noticing. The one exception is an abandon on the first floor, which
 /// is a reroll rather than a run — see <see cref="IgnoreEarlyAbandons" />.
 ///
-/// Two rules are not optional and so are not settings. <b>Co-op runs are always
-/// excluded</b>: a shared win is not the same evidence about your play as a solo one, and
-/// mixing them makes every rate below mean two things at once. <b>Runs are ordered by
-/// start time</b>, because the block tables and the streaks are claims about sequence.
-/// The screen states the co-op rule in its footer rather than dropping runs silently.
+/// Player mode defaults to singleplayer and applies before any report is calculated.
+/// Runs are ordered by start time because the block tables and streaks describe sequence.
 /// </summary>
 internal sealed record RunFilter
 {
@@ -21,6 +25,8 @@ internal sealed record RunFilter
 
     /// <summary>How <see cref="Scope" /> reads when no window is set.</summary>
     public const string EverySince = "all time";
+
+    public PlayerMode Mode { get; init; } = PlayerMode.Singleplayer;
 
     /// <summary>Ascension to report on, or null for every ascension together.</summary>
     public int? Ascension { get; init; }
@@ -70,10 +76,18 @@ internal sealed record RunFilter
     public string Scope => WindowDays is { } days ? $"in the last {days} days" : EverySince;
 
     public bool Matches(RunRecord run) =>
-        run.PlayerCount <= 1
+        MatchesMode(run)
         && !(IgnoreEarlyAbandons && run.IsEarlyAbandon)
         && (Ascension is null || run.Ascension == Ascension)
         && (Character is null || run.Character == Character);
+
+    public bool MatchesMode(RunRecord run) => Mode switch
+    {
+        PlayerMode.Singleplayer => run.PlayerCount <= 1,
+        PlayerMode.Multiplayer => run.PlayerCount > 1,
+        PlayerMode.All => true,
+        _ => false,
+    };
 
     /// <summary>The matching runs, oldest first.</summary>
     public IReadOnlyList<RunRecord> Apply(IEnumerable<RunRecord> runs)

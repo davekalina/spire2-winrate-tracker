@@ -23,7 +23,7 @@ internal sealed record RunRecord
     /// <summary>Display name, e.g. <c>Necrobinder</c>. See <see cref="RunParser.CleanId" />.</summary>
     public required string Character { get; init; }
 
-    /// <summary>1 for a solo run. Co-op runs are excluded from the tables; see <see cref="RunFilter" />.</summary>
+    /// <summary>1 for a solo run, more than 1 for co-op. Drives the player-mode filter.</summary>
     public required int PlayerCount { get; init; }
 
     public required float RunTimeSeconds { get; init; }

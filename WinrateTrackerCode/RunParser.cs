@@ -24,12 +24,14 @@ internal static class RunParser
     private const string NoEncounter = "NONE.NONE";
 
     /// <summary>
-    /// Parse one run. Returns null if the JSON is malformed or is not a run object.
+    /// Parse one run. Returns null for invalid data or an unidentified multiplayer player.
     /// </summary>
     /// <param name="fileName">Archive file name, used as the cache key and as the
     /// fallback source of the start time.</param>
     /// <param name="json">The file's contents.</param>
-    public static RunRecord? Parse(string fileName, string json)
+    /// <param name="localPlayerIds">Local IDs by saved platform name, captured on the main thread.</param>
+    public static RunRecord? Parse(string fileName, string json,
+        IReadOnlyDictionary<string, ulong>? localPlayerIds = null)
     {
         JsonDocument document;
         try
@@ -51,6 +53,12 @@ internal static class RunParser
             if (startTime is null)
                 return null;
 
+            var playerCount = ReadArrayLength(root, "players");
+            var player = ReadLocalPlayer(root, localPlayerIds);
+            // An arbitrary teammate must never supply this player's character or picks.
+            if (playerCount > 1 && player.ValueKind != JsonValueKind.Object)
+                return null;
+
             CountRooms(root, out var nodes, out var actsEntered, out var counts);
 
             var win = ReadBoolean(root, "win");
@@ -64,10 +72,10 @@ internal static class RunParser
                 Ascension = ReadInt32(root, "ascension") ?? 0,
                 Win = win,
                 Abandoned = ReadBoolean(root, "was_abandoned"),
-                Character = ReadCharacter(root),
-                PickedCards = ReadPicks(root, "deck"),
-                PickedRelics = ReadPicks(root, "relics"),
-                PlayerCount = ReadArrayLength(root, "players"),
+                Character = player.ValueKind == JsonValueKind.Object ? CleanId(ReadString(player, "character")) : "",
+                PickedCards = ReadPicks(player, "deck"),
+                PickedRelics = ReadPicks(player, "relics"),
+                PlayerCount = playerCount,
                 RunTimeSeconds = ReadSingle(root, "run_time") ?? 0f,
                 Nodes = nodes,
                 ActReached = win ? 4 : Math.Max(1, actsEntered),
@@ -136,18 +144,13 @@ internal static class RunParser
 
     /// <summary>
     /// The distinct ids in one of the player's lists that were added after the run started.
-    /// Reads only the first player: co-op runs are filtered out of every table anyway, and
-    /// the deck of someone else's character is not this player's pick.
+    /// The player has already been selected by identity for a multiplayer run.
     /// </summary>
-    private static IReadOnlyList<string> ReadPicks(JsonElement root, string property)
+    private static IReadOnlyList<string> ReadPicks(JsonElement player, string property)
     {
-        if (!root.TryGetProperty("players", out var players) || players.ValueKind != JsonValueKind.Array)
+        if (player.ValueKind != JsonValueKind.Object)
             return [];
-
-        using var player = players.EnumerateArray();
-        if (!player.MoveNext() || player.Current.ValueKind != JsonValueKind.Object)
-            return [];
-        if (!player.Current.TryGetProperty(property, out var entries) || entries.ValueKind != JsonValueKind.Array)
+        if (!player.TryGetProperty(property, out var entries) || entries.ValueKind != JsonValueKind.Array)
             return [];
 
         var picked = new List<string>();
@@ -307,17 +310,28 @@ internal static class RunParser
         return long.TryParse(stem, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : null;
     }
 
-    private static string ReadCharacter(JsonElement root)
+    private static JsonElement ReadLocalPlayer(JsonElement root, IReadOnlyDictionary<string, ulong>? localPlayerIds)
     {
         if (!root.TryGetProperty("players", out var players) || players.ValueKind != JsonValueKind.Array)
-            return "";
+            return default;
+        // Preserve old solo files, including runs saved without a platform or player ID.
+        if (players.GetArrayLength() == 1)
+            return players[0];
+
+        var platform = ReadString(root, "platform_type") ?? "none";
+        if (localPlayerIds is null || !localPlayerIds.TryGetValue(platform, out var localId))
+            return default;
+
         foreach (var player in players.EnumerateArray())
         {
-            if (player.ValueKind == JsonValueKind.Object && player.TryGetProperty("character", out var character))
-                return CleanId(character.ValueKind == JsonValueKind.String ? character.GetString() : null);
-            break;
+            if (player.ValueKind == JsonValueKind.Object
+                && player.TryGetProperty("id", out var id)
+                && id.ValueKind == JsonValueKind.Number
+                && id.TryGetUInt64(out var playerId)
+                && playerId == localId)
+                return player;
         }
-        return "";
+        return default;
     }
 
     private static int ReadArrayLength(JsonElement root, string name) =>

@@ -36,7 +36,7 @@ internal sealed class PickFilterBar
     private const string NoCaption = "";
 
     private const string AnyRarityText = "All Rarities";
-    private const int Separation = 14;
+    private const int Separation = 8;
 
     private readonly HBoxContainer _row;
     private readonly ComboBox _minimum;

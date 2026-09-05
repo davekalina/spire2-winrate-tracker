@@ -61,6 +61,7 @@ internal sealed class ComboBox
     public readonly record struct Option(string Text, object? Value, string? Icon = null);
 
     private readonly Control _host;
+    private readonly float _listMinWidth;
     private readonly PanelContainer _button;
     private readonly MegaLabel _value;
     private readonly Control _iconSlot;
@@ -81,9 +82,10 @@ internal sealed class ComboBox
     /// front of them, and the row has better uses for the width. A caption earns its place
     /// only where the value alone is ambiguous — "10" needs "Ascension".
     /// </summary>
-    public ComboBox(Control host, string caption)
+    public ComboBox(Control host, string caption, float listMinWidth = ListMinWidth)
     {
         _host = host;
+        _listMinWidth = listMinWidth;
 
         _button = new PanelContainer
         {
@@ -419,7 +421,7 @@ internal sealed class ComboBox
         var buttonRect = _button.GetGlobalRect();
         var hostRect = _host.GetGlobalRect();
 
-        var width = Math.Max(ListMinWidth, Math.Max(buttonRect.Size.X, panel.GetCombinedMinimumSize().X));
+        var width = Math.Max(_listMinWidth, Math.Max(buttonRect.Size.X, panel.GetCombinedMinimumSize().X));
         var height = Math.Min(ListMaxHeight, (optionCount * OptionHeight) + (ListPaddingY * 2) + ListBorder);
         panel.Size = new Vector2(width, height);
 

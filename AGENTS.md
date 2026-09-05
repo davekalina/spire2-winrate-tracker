@@ -54,8 +54,9 @@ row (ascension, character, time window). One setting lives in Settings → Mod S
 
 Settled decisions worth not relitigating:
 
-- **Co-op runs are always excluded.** A shared win is not the same evidence about your
-  play as a solo one. The screen says so rather than dropping them silently.
+- **Player mode is a compact SP/MP/All filter, defaulting to SP.** It applies to the
+  entire report, including streaks. Multiplayer character and pick data must come from
+  the local player's saved ID, never an arbitrary teammate. Each run counts once.
 - **An abandoned run counts as a loss.** Quitting a run you were losing is not a different
   outcome from losing it. The one exception is a floor-1 abandon, which is a reroll; the
   mod setting drops those and is on by default. It is a setting rather than a filter-row
@@ -73,7 +74,7 @@ Settled decisions worth not relitigating:
 Any directional change must be applied across all of these.
 
 - The Compendium tile (`CompendiumTilePatch`) — label, icon, tint, focus neighbours.
-- The filter row (`FilterBar`) — the three paginators and the summary line under them.
+- The filter row (`FilterBar`) — player mode, ascension, character, time window, and summary.
 - All three tabs (`ReportTables`) — a wording, rounding, or column change belongs in every
   table it applies to, not just the one that was reported. Records read `13-37 (26%)`
   wherever a record appears.

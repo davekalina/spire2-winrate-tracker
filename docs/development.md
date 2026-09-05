@@ -22,6 +22,12 @@ in there.
 
 ## Tests
 
+The SP/MP/All filter defaults to SP and narrows the input to every report calculation,
+including streaks. Multiplayer runs count once and select character/card/relic data by
+the local player's ID for the saved platform. Platform IDs are captured on the main
+thread before reading history in the background. Unidentifiable multiplayer runs are
+logged and included in the existing unreadable-file count instead of guessing a player.
+
 Anything that does not touch Godot or the game's assemblies lives in its own file and is
 linked into `WinrateTracker.Tests` — parsing, filtering, the aggregations, and the exact
 text of every table cell. That means the whole screen's contents can be asserted without

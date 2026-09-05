@@ -196,7 +196,7 @@ public class RunParserTests
     }
 
     [Fact]
-    public void Records_co_op_player_counts_so_they_can_be_excluded()
+    public void A_co_op_run_without_player_identity_is_skipped()
     {
         var json = """
         {
@@ -205,10 +205,7 @@ public class RunParserTests
         }
         """;
 
-        var run = Parse(json, "1700000000.run");
-
-        Assert.Equal(2, run.PlayerCount);
-        Assert.Equal("Ironclad", run.Character);
+        Assert.Null(RunParser.Parse("1700000000.run", json));
     }
 
     [Theory]

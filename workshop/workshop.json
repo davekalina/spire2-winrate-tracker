@@ -2,7 +2,7 @@
   "title": "Winrate Tracker",
   "description": "Winrate Tracker tracks your winrate over time!  Amazing!\n\nFeatures include:\n- Shows reports based on actual run history per-profile and per-ascension.\n- Calculates total winrate and splits (per-month, per-patch, per-10 game samples, per-50 game samples).\n- Per-character and time period filters.\n- Per-card and per-relic winrates.\n- Time of day splits (I'm better in the evening, which is odd!)\n- Charts and graphs!  They're not that exciting, really, but they exist.\n- Can optionally exclude floor 1 abandons.\n\nProject source on Github here:  https://github.com/davekalina/spire2-winrate-tracker\n\nWinrate Tracker currently works with version 0.111.0 on the beta-branch only.",
   "visibility": "public",
-  "changeNote": "A visual refresh of the whole screen.\n\n- Overview is now Home: your last fifty runs as the headline, a trend chart, your last ten runs as pips, and every character's recent form side by side. Press a character to narrow the screen to them.\n- Hover any run pip for that run — character, ascension, when, how long, and how it ended.\n- Hover a card or relic to see the real card or relic.\n- Search cards and relics by name.\n- Filters are drop-downs now, and all of them fit one row.\n- Tables show rarity and character icons, alternating rows, and a bar putting each row against your own average.\n- Opens on the highest ascension you have played.",
+  "changeNote": "v1.6.0\n\n- Added a compact SP/MP/All filter for win rates, streaks, and every report. SP is the default.\n- Multiplayer reports use your own character, cards, and relics.\n- Tightened the filter row to make room for the new selector.",
   "tags": [
     "Utility"
   ],

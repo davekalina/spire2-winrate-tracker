@@ -23,7 +23,7 @@ internal sealed class SearchBox
 {
     private const int FontSize = 20;
     private const int PaddingX = 14;
-    private const float MinWidth = 230f;
+    private const float MinWidth = 160f;
 
     /// <summary>
     /// How long typing has to stop before the tables are rebuilt.
