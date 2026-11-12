@@ -53,9 +53,10 @@ a screen that silently did nothing:
 
 ## After a game update
 
-The mod has to keep loading on the game's main branch as well as the new build, so a
-clean compile against the new `sts2.dll` is not the finish line: it only proves the new
-build. To find what moved:
+The mod has to keep loading on every game build `min_game_version` admits, not just the
+new one, so a clean compile against the new `sts2.dll` is not the finish line: it only
+proves the new build. (Check where main actually is, too: on 2026-11-12 the beta was 0.113
+but main was still 0.107.1, below `min_game_version`, so the mod was beta-only.) To find what moved:
 
 1. Build against the new game, and take the last published DLL (the Workshop copy under
    `steamapps/workshop/content/2868840/3775014144/`, built against the old game).
@@ -82,6 +83,12 @@ run next. Get the uploader from
 Bump `version` in `WinrateTracker.json` **and** `Version` in `WinrateTrackerCode/MainFile.cs`
 together, write a real `changeNote` in `workshop/workshop.json`, and push to GitHub before
 uploading, so the published version always corresponds to a commit.
+
+After uploading, set the item's supported branch range on its change notes page
+(`steamcommunity.com/sharedfiles/filedetails/changelog/3775014144`). Steam attaches it to
+the item version, so it has to be done after every upload. While main is below
+`min_game_version`, that range is the beta branch only. Do not put `minBranch`/`maxBranch`
+in `workshop.json`; see `docs/sts2-modding.md`.
 
 `workshop/mod_id.txt` is the only link between this repository and the published Workshop
 item. Losing it orphans the item and makes the next upload a duplicate.

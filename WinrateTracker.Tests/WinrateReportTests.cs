@@ -460,13 +460,13 @@ public class WinrateReportTests
     }
 
     /// <summary>
-    /// A player moving between the main branch (0.111) and the beta (0.113) plays both
-    /// builds in the same weeks. "This patch" is the newest build played, by version, with
-    /// only that build's runs in it — runs played on main afterwards do not drag it back
-    /// to v0.111, and do not leak into the v0.113 figure.
+    /// A player moving between two builds the mod loads on — here 0.111 and the 0.113 beta —
+    /// plays both in the same weeks. "This patch" is the newest build played, by version,
+    /// with only that build's runs in it: runs played on the older build afterwards do not
+    /// drag it back to v0.111, and do not leak into the v0.113 figure.
     /// </summary>
     [Fact]
-    public void This_patch_is_the_newest_build_played_even_when_older_builds_are_played_after_it()
+    public void This_patch_is_the_newest_build_played_even_when_an_older_build_is_played_after_it()
     {
         var runs = new List<RunRecord>
         {

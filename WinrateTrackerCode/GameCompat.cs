@@ -5,7 +5,8 @@ namespace WinrateTracker.WinrateTrackerCode;
 
 /// <summary>
 /// The places where the game builds this mod supports disagree, answered for all of them,
-/// so one DLL loads on the main branch (0.111) and on the beta (0.113) alike.
+/// so one DLL loads on every build the manifest admits: 0.111 and 0.113 (the beta). Main
+/// is still 0.107.1, below min_game_version, so for now that means the beta only.
 ///
 /// Each member here exists because a direct call compiled against one build fails on the
 /// other. That failure is not a compile error anyone sees. It is a

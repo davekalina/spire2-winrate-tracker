@@ -61,10 +61,10 @@ internal static class GameArt
     };
 
     /// <summary>
-    /// Art that only some of the supported game builds ship. The Fool arrived in 0.113, but
-    /// a player who has been on the beta and gone back to main still has Fool runs in their
-    /// history, so 0.111 is asked for an icon it does not have. That is expected, not a
-    /// moved path, so it costs the icon without a warning in the log.
+    /// Art that only some of the game builds the manifest admits ship. The Fool arrived in
+    /// 0.113, but 0.111 also loads this mod, and a profile that has played 0.113 has Fool
+    /// runs in its history, so 0.111 can be asked for an icon it does not have. That is
+    /// expected, not a moved path, so it costs the icon without a warning in the log.
     /// </summary>
     private static readonly HashSet<string> NotInEveryBuild = new(StringComparer.Ordinal)
     {

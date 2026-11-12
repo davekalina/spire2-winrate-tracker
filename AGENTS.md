@@ -42,8 +42,9 @@ row (ascension, character, time window). One setting lives in Settings → Mod S
   archive — reports, streaks, and the ascension and character lists — the way a rule about
   what counts as a run should be applied. Daily and custom runs are still counted, as they
   always have been.
-- **One build serves every supported game version** — currently 0.111 (main) and 0.113
-  (beta). Where they differ, the call goes through `GameCompat` by name and takes whichever
+- **One build serves every game version the manifest admits** — 0.111 and 0.113. Main is
+  still 0.107.1, below `min_game_version`, so in practice the mod is beta-only (0.113)
+  until Mega Crit promotes a newer build to main. Where builds differ, the call goes through `GameCompat` by name and takes whichever
   form the running game has; never call a member that differs between them directly. A
   direct call compiles against whichever `sts2.dll` is installed and then throws
   `MissingMethodException` on the other build, when the runtime compiles the *calling*
@@ -207,3 +208,9 @@ The `workshop/` directory is this mod's uploader workspace. See
   the changelog subscribers see.
 - Bump the manifest version and push to GitHub before uploading, so the
   published version always corresponds to a commit.
+- Keep the item limited to the branches the manifest can load on. While main is below
+  `min_game_version` (main is 0.107.1 as of 2026-11-12), the item stays **beta-only**: after
+  every upload, set the supported branch range to `public-beta` only on the item's change
+  notes page, because Steam attaches the range to each item version. Never set
+  `minBranch`/`maxBranch` in `workshop.json` (see `docs/sts2-modding.md`). The Workshop
+  description says the same: "works with version 0.113.0 on the beta branch only".
