@@ -51,6 +51,24 @@ a screen that silently did nothing:
    after a game update rather than waiting to notice a blank column.
 4. **The game log**, as above.
 
+## After a game update
+
+The mod has to keep loading on the game's main branch as well as the new build, so a
+clean compile against the new `sts2.dll` is not the finish line: it only proves the new
+build. To find what moved:
+
+1. Build against the new game, and take the last published DLL (the Workshop copy under
+   `steamapps/workshop/content/2868840/3775014144/`, built against the old game).
+2. Disassemble both with `ilspycmd -il` and compare every `[sts2]` member and type they
+   reference. Any member present in one and not the other is a signature that moved, and
+   a direct call to it throws `MissingMethodException` on one of the two builds. Route it
+   through `GameCompat`, then check the fixed build references nothing the old one did not.
+3. Run the Harmony targets, reflected field names, and `GameCompat`'s own lookups against
+   the new `sts2.dll`, and check every scene path, node path, texture, font, and loc table
+   the mod names against the new `.pck`.
+4. Check the run-history schema (`RunHistory` and its migrations) for new fields or new
+   values of the ones `RunParser` reads. 0.113 took it to v11 and added the Blitz mode.
+
 ## Publish to the Steam Workshop
 
 ```powershell

@@ -219,4 +219,34 @@ public class RunParserTests
     {
         Assert.Equal(expected, RunParser.CleanId(raw));
     }
+
+    [Theory]
+    // v10 and earlier: custom runs were their own game mode.
+    [InlineData("\"game_mode\": \"standard\",", false)]
+    [InlineData("\"game_mode\": \"daily\",", false)]
+    [InlineData("\"game_mode\": \"custom\",", false)]
+    // v11 (game 0.113): custom is a flag beside the mode, and Blitz and Dread are new.
+    [InlineData("\"game_mode\": \"standard\", \"is_custom_game\": true,", false)]
+    [InlineData("\"game_mode\": \"dread\",", false)]
+    [InlineData("\"game_mode\": \"blitz\",", true)]
+    [InlineData("\"game_mode\": \"Blitz\",", true)]
+    // No mode at all: older than the field, and so not Blitz.
+    [InlineData("", false)]
+    public void Reads_whether_a_run_was_blitz(string modeFields, bool blitz)
+    {
+        var json = $$"""
+        {
+          "schema_version": 11,
+          {{modeFields}}
+          "win": true,
+          "start_time": 1785189461,
+          "ascension": 3,
+          "build_id": "v0.113.0",
+          "players": [{ "character": "CHARACTER.SILENT" }],
+          "map_point_history": []
+        }
+        """;
+
+        Assert.Equal(blitz, Parse(json).Blitz);
+    }
 }

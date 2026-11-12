@@ -139,4 +139,14 @@ public class RunFilterTests
     {
         Assert.Empty(new RunFilter { Ascension = 99, WindowDays = 30 }.Apply(Spanning90Days));
     }
+
+    [Fact]
+    public void Blitz_runs_do_not_count_and_everything_else_does()
+    {
+        Assert.False(RunFilter.Counts(Run(Unix(2026, 1, 1)) with { Blitz = true }));
+        Assert.True(RunFilter.Counts(Run(Unix(2026, 1, 1))));
+        // Rerolls and co-op are the filter's business, not this rule's.
+        Assert.True(RunFilter.Counts(Run(Unix(2026, 1, 1), abandoned: true, nodes: 1)));
+        Assert.True(RunFilter.Counts(Run(Unix(2026, 1, 1), playerCount: 2)));
+    }
 }

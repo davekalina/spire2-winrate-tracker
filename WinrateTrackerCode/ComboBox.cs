@@ -314,8 +314,11 @@ internal sealed class ComboBox
         // B / Escape closes the list rather than the screen underneath it, for exactly as
         // long as the list is up.
         _cancel = Close;
-        foreach (var hotkey in CancelHotkeys)
-            NHotkeyManager.Instance?.PushHotkeyReleasedBinding(hotkey, _cancel);
+        if (NHotkeyManager.Instance is { } hotkeys)
+        {
+            foreach (var hotkey in CancelHotkeys)
+                GameCompat.PushHotkeyReleasedBinding(hotkeys, hotkey, _cancel);
+        }
 
         // The cursor opens on what is already selected, so a pad can see where it is in the
         // list before it starts moving.
@@ -455,8 +458,11 @@ internal sealed class ComboBox
     {
         if (_cancel is not null)
         {
-            foreach (var hotkey in CancelHotkeys)
-                NHotkeyManager.Instance?.RemoveHotkeyReleasedBinding(hotkey, _cancel);
+            if (NHotkeyManager.Instance is { } hotkeys)
+            {
+                foreach (var hotkey in CancelHotkeys)
+                    GameCompat.RemoveHotkeyReleasedBinding(hotkeys, hotkey, _cancel);
+            }
             _cancel = null;
         }
 

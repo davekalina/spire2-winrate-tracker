@@ -75,6 +75,20 @@ internal sealed record RunFilter
     /// </summary>
     public string Scope => WindowDays is { } days ? $"in the last {days} days" : EverySince;
 
+    /// <summary>
+    /// Whether a run is a run of the game this mod reports on at all, before any filter.
+    ///
+    /// Blitz runs are not. A Blitz act is a handful of rooms and a boss, and Blitz keeps an
+    /// ascension ladder of its own, so a Blitz A5 win counted toward the A5 win rate would
+    /// be a different game's result filed under the same number. Like the floor-1 reroll
+    /// rule, this is a statement about what counts as a run, so it is applied to the whole
+    /// archive — the ascension and character lists included — rather than offered as a
+    /// filter.
+    ///
+    /// Daily and custom runs have always been counted and still are.
+    /// </summary>
+    public static bool Counts(RunRecord run) => !run.Blitz;
+
     public bool Matches(RunRecord run) =>
         MatchesMode(run)
         && !(IgnoreEarlyAbandons && run.IsEarlyAbandon)

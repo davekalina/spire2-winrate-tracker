@@ -28,6 +28,12 @@ internal sealed record RunRecord
 
     public required float RunTimeSeconds { get; init; }
 
+    /// <summary>
+    /// A run of the Blitz mode added in game 0.113: a short map per act and an ascension
+    /// ladder of its own. Not counted — see <see cref="RunFilter.Counts" />.
+    /// </summary>
+    public bool Blitz { get; init; }
+
     /// <summary>Map points entered across every act. The run's length.</summary>
     public required int Nodes { get; init; }
 

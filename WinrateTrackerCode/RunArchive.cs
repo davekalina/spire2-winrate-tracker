@@ -177,7 +177,9 @@ internal static class RunArchive
 
         UnreadableFiles = unreadable;
         FailureReason = null;
-        Runs = Cache.Values.OrderBy(run => run.StartTime).ToList();
+        // Blitz runs stay in the cache, so they are not re-read every time the screen
+        // opens, but never reach a report or a filter list.
+        Runs = Cache.Values.Where(RunFilter.Counts).OrderBy(run => run.StartTime).ToList();
     }
 
     /// <summary>Every ascension present in the archive, highest first. Drives the filter.</summary>

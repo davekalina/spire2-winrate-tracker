@@ -96,8 +96,11 @@ internal sealed class ModalPanel
         // the modal is up and removed the moment it closes — which is exactly how the
         // game's own patch notes screen sits over the main menu.
         modal._cancel = modal.Close;
-        foreach (var hotkey in CancelHotkeys)
-            NHotkeyManager.Instance?.PushHotkeyReleasedBinding(hotkey, modal._cancel);
+        if (NHotkeyManager.Instance is { } hotkeys)
+        {
+            foreach (var hotkey in CancelHotkeys)
+                GameCompat.PushHotkeyReleasedBinding(hotkeys, hotkey, modal._cancel);
+        }
 
         // Focus lands on Close so a gamepad has somewhere to be, and so the modal owns
         // navigation instead of leaving it on whatever was focused behind it.
@@ -139,8 +142,11 @@ internal sealed class ModalPanel
     {
         if (_cancel is not null)
         {
-            foreach (var hotkey in CancelHotkeys)
-                NHotkeyManager.Instance?.RemoveHotkeyReleasedBinding(hotkey, _cancel);
+            if (NHotkeyManager.Instance is { } hotkeys)
+            {
+                foreach (var hotkey in CancelHotkeys)
+                    GameCompat.RemoveHotkeyReleasedBinding(hotkeys, hotkey, _cancel);
+            }
             _cancel = null;
         }
 

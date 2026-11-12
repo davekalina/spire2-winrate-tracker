@@ -18,6 +18,8 @@ a rarity of their own.
 
 The numbers come from the `.run` files the game already writes for every finished run, so
 nothing needs enabling first and runs from before you installed the mod are included.
+Blitz runs are left out: Blitz is a shorter game with its own ascension ladder, and its
+results would muddy the win rate at every ascension they share a number with.
 Reading them happens off the main thread and is cached, so the screen opens without a
 stutter.
 
@@ -25,8 +27,8 @@ Everything works with mouse and keyboard or with a gamepad.
 
 ## Installing
 
-Subscribe on the [Steam Workshop][workshop]. Requires Slay the Spire 2 v0.111 or newer,
-on the beta branch.
+Subscribe on the [Steam Workshop][workshop]. Works on Slay the Spire 2 v0.111 (the main
+branch) and v0.113 (the beta branch).
 
 ## Building
 

@@ -34,8 +34,24 @@ row (ascension, character, time window). One setting lives in Settings → Mod S
 - **The files are parsed by hand, not through `SaveManager.LoadRunHistory`.** That path
   runs save migrations and deserializes the whole run — deck, relics, every per-floor
   stat block — to answer a question that needs a dozen scalars. `RunParser` reads the raw
-  JSON instead. The archive already spans schema v8 through v10 and the fields it reads have
-  been stable across both.
+  JSON instead. The archive already spans schema v8 through v11 and the fields it reads have
+  been stable across all of them.
+- **Blitz runs are not counted.** Game 0.113 added a Blitz mode: a handful of rooms per
+  act and an ascension ladder of its own, so its runs would file a different game's
+  results under the same ascension numbers. `RunFilter.Counts` drops them from the whole
+  archive — reports, streaks, and the ascension and character lists — the way a rule about
+  what counts as a run should be applied. Daily and custom runs are still counted, as they
+  always have been.
+- **One build serves every supported game version** — currently 0.111 (main) and 0.113
+  (beta). Where they differ, the call goes through `GameCompat` by name and takes whichever
+  form the running game has; never call a member that differs between them directly. A
+  direct call compiles against whichever `sts2.dll` is installed and then throws
+  `MissingMethodException` on the other build, when the runtime compiles the *calling*
+  method — so the whole method fails, and Godot logs it and carries on. The one known
+  difference: `NHotkeyManager.Push/RemoveHotkeyReleasedBinding` (0.113 added a trailing
+  `long sequence = 0` to Push and made Remove return it), which `ComboBox` and
+  `ModalPanel` use to take Escape/B while open. See `docs/development.md` for how to check
+  the next game update.
 - **The screen is a second instance of the native Statistics screen**, contents replaced.
   It has to be a real `NSubmenu` to go on the submenu stack, and a mod assembly cannot
   declare one — a subclass of a Godot script type needs a registered script, which only

@@ -11,9 +11,11 @@ namespace WinrateTracker.WinrateTrackerCode;
 /// <c>SaveManager.LoadRunHistory</c>. That path runs the save migration pipeline and
 /// deserializes the whole run — deck, relics, and every per-floor stat block — which is
 /// both far more work than a win rate needs and a source of failure on old files: the
-/// archive here spans schema v8 through v10, and older files still on disk migrate on every
+/// archive here spans schema v8 through v11, and older files still on disk migrate on every
 /// read. The fields below (result, ascension, character, room types) have been stable
 /// across those versions, so reading them directly is faster *and* survives more files.
+/// v11 (game 0.113) only moved custom runs from <c>game_mode: "custom"</c> to
+/// <c>is_custom_game</c>, and added the <c>blitz</c> and <c>dread</c> game modes.
 ///
 /// Every field is optional. A file missing something yields a record with a default
 /// rather than an exception, and a file that will not parse at all yields null — one
@@ -22,6 +24,9 @@ namespace WinrateTracker.WinrateTrackerCode;
 internal static class RunParser
 {
     private const string NoEncounter = "NONE.NONE";
+
+    /// <summary>How a run file names the Blitz game mode (0.113 and later).</summary>
+    private const string BlitzMode = "blitz";
 
     /// <summary>
     /// Parse one run. Returns null for invalid data or an unidentified multiplayer player.
@@ -77,6 +82,7 @@ internal static class RunParser
                 PickedRelics = ReadPicks(player, "relics"),
                 PlayerCount = playerCount,
                 RunTimeSeconds = ReadSingle(root, "run_time") ?? 0f,
+                Blitz = string.Equals(ReadString(root, "game_mode"), BlitzMode, StringComparison.OrdinalIgnoreCase),
                 Nodes = nodes,
                 ActReached = win ? 4 : Math.Max(1, actsEntered),
                 Elites = counts.Elites,
