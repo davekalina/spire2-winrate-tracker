@@ -42,10 +42,10 @@ internal static class ArtKey
     public const string Clock = "clock";
 
     /// <summary>
-    /// The five playable characters. Matched on the display name the run files reduce to —
-    /// <c>CHARACTER.NECROBINDER</c> becomes <c>Necrobinder</c> — lowercased, which is
-    /// exactly how the game names the icon files. A character this build has never heard of
-    /// gets no icon rather than a broken one.
+    /// The playable characters — six as of game 0.113, which added the Fool. Matched on the
+    /// display name the run files reduce to — <c>CHARACTER.NECROBINDER</c> becomes
+    /// <c>Necrobinder</c> — lowercased, which is exactly how the game names the icon files. A
+    /// character this build has never heard of gets no icon rather than a broken one.
     /// </summary>
     public static string? Character(string? character) =>
         string.IsNullOrWhiteSpace(character)

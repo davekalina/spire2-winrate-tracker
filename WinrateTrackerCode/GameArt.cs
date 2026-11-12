@@ -39,6 +39,7 @@ internal static class GameArt
         ["character/defect"] = "ui/top_panel/character_icon_defect.png",
         ["character/regent"] = "ui/top_panel/character_icon_regent.png",
         ["character/necrobinder"] = "ui/top_panel/character_icon_necrobinder.png",
+        ["character/fool"] = "ui/top_panel/character_icon_fool.png",
 
         [ArtKey.Ascension] = "ui/game_over_screen/score_ascension.png",
         [ArtKey.Clock] = "packed/statistics_screen/stats_clock.png",
@@ -57,6 +58,17 @@ internal static class GameArt
         ["rarity/relics/shop"] = "ui/run_history/shop.png",
         ["rarity/relics/event"] = "ui/run_history/event.png",
         ["rarity/relics/ancient"] = "ui/run_history/ancient.png",
+    };
+
+    /// <summary>
+    /// Art that only some of the supported game builds ship. The Fool arrived in 0.113, but
+    /// a player who has been on the beta and gone back to main still has Fool runs in their
+    /// history, so 0.111 is asked for an icon it does not have. That is expected, not a
+    /// moved path, so it costs the icon without a warning in the log.
+    /// </summary>
+    private static readonly HashSet<string> NotInEveryBuild = new(StringComparer.Ordinal)
+    {
+        "character/fool",
     };
 
     private static readonly Dictionary<string, Texture2D> Loaded = new(StringComparer.Ordinal);
@@ -86,7 +98,8 @@ internal static class GameArt
             // the log with them.
             if (!ResourceLoader.Exists(path))
             {
-                MainFile.Logger.Warn($"The game has no texture at {path}; '{key}' will show no icon.");
+                if (!NotInEveryBuild.Contains(key))
+                    MainFile.Logger.Warn($"The game has no texture at {path}; '{key}' will show no icon.");
                 Paths.Remove(key);
                 return null;
             }

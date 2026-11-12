@@ -249,4 +249,14 @@ public class RunParserTests
 
         Assert.Equal(blitz, Parse(json).Blitz);
     }
+
+    [Theory]
+    [InlineData("CHARACTER.IRONCLAD", "character/ironclad")]
+    [InlineData("CHARACTER.NECROBINDER", "character/necrobinder")]
+    // 0.113's new character. GameArt keys its icon, character_icon_fool.png, on this.
+    [InlineData("CHARACTER.FOOL", "character/fool")]
+    public void A_run_files_character_names_its_icon(string raw, string key)
+    {
+        Assert.Equal(key, ArtKey.Character(RunParser.CleanId(raw)));
+    }
 }

@@ -460,6 +460,31 @@ public class WinrateReportTests
     }
 
     /// <summary>
+    /// A player moving between the main branch (0.111) and the beta (0.113) plays both
+    /// builds in the same weeks. "This patch" is the newest build played, by version, with
+    /// only that build's runs in it — runs played on main afterwards do not drag it back
+    /// to v0.111, and do not leak into the v0.113 figure.
+    /// </summary>
+    [Fact]
+    public void This_patch_is_the_newest_build_played_even_when_older_builds_are_played_after_it()
+    {
+        var runs = new List<RunRecord>
+        {
+            Run(Unix(2026, 11, 1), win: true, buildId: "v0.111.0"),
+            Run(Unix(2026, 11, 12), win: true, buildId: "v0.113.0"),
+            Run(Unix(2026, 11, 13), buildId: "v0.111.0"),
+            Run(Unix(2026, 11, 14), buildId: "v0.111.0"),
+        };
+
+        var patch = WinrateReport.Build(runs).Patch!;
+
+        Assert.Equal("v0.113", patch.Current.Label);
+        Assert.Equal(1, patch.Current.Tally.Runs);
+        Assert.Equal("v0.111", patch.Previous!.Label);
+        Assert.Equal(3, patch.Previous.Tally.Runs);
+    }
+
+    /// <summary>
     /// A month carries a short form of its label for places with no room for the year. Only
     /// months do: a patch label is already as short as it gets, and a block's is a range
     /// that means nothing cut down.
