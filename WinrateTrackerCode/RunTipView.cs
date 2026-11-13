@@ -61,14 +61,15 @@ internal static class RunTipView
             portrait.AddChild(icon);
         }
 
-        // A Dread run's file carries an ascension number that is not its difficulty, so it
-        // gets no number badge; the detail line says Dread instead.
-        if (!run.Dread)
-            portrait.AddChild(Badge(run.Ascension));
+        portrait.AddChild(Badge(run.Level));
         return portrait;
     }
 
-    private static Control Badge(int ascension)
+    /// <summary>
+    /// The ascension flame with its number, or for a Dread run the Dread mark alone — the
+    /// way the game's game-over screen scores the two.
+    /// </summary>
+    private static Control Badge(int level)
     {
         var badge = new Control
         {
@@ -84,13 +85,16 @@ internal static class RunTipView
             OffsetBottom = BadgeOverhang,
         };
 
-        if (GameArt.Icon(ArtKey.Ascension, BadgeSize) is { } flame)
+        var dread = level == RunRecord.DreadLevel;
+        if (GameArt.Icon(dread ? ArtKey.Dread : ArtKey.Ascension, BadgeSize) is { } flame)
         {
             flame.SetAnchorsPreset(Control.LayoutPreset.FullRect);
             badge.AddChild(flame);
         }
+        if (dread)
+            return badge;
 
-        var number = NativeStyle.Figure(Format.Count(ascension), BadgeFontSize, NativeStyle.CellColor);
+        var number = NativeStyle.Figure(Format.Count(level), BadgeFontSize, NativeStyle.CellColor);
         number.HorizontalAlignment = HorizontalAlignment.Center;
         number.VerticalAlignment = VerticalAlignment.Center;
         number.SetAnchorsPreset(Control.LayoutPreset.FullRect);

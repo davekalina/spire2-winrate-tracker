@@ -42,6 +42,7 @@ internal static class GameArt
         ["character/fool"] = "ui/top_panel/character_icon_fool.png",
 
         [ArtKey.Ascension] = "ui/game_over_screen/score_ascension.png",
+        [ArtKey.Dread] = "ui/game_over_screen/score_dread.png",
         [ArtKey.Clock] = "packed/statistics_screen/stats_clock.png",
 
         ["rarity/cards/common"] = "ui/reward_screen/reward_icon_card.png",

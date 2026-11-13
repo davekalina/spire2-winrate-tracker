@@ -109,6 +109,15 @@ internal sealed record RunFilter
         _ => false,
     };
 
+    /// <summary>
+    /// The highest rung — Dread above A10 — among the runs this filter would show at every
+    /// ascension, or null when it shows none. The screen opens on this, so it has to come
+    /// from runs the rest of the filter keeps: a Dread run played only in co-op, or only
+    /// rerolled on floor 1, must not open a solo screen on an empty Dread.
+    /// </summary>
+    public int? HighestAscension(IEnumerable<RunRecord> runs) =>
+        runs.Where((this with { Ascension = null }).Matches).Select(run => (int?)run.Level).Max();
+
     /// <summary>The matching runs, oldest first.</summary>
     public IReadOnlyList<RunRecord> Apply(IEnumerable<RunRecord> runs)
     {

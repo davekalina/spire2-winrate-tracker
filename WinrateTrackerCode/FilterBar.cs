@@ -152,14 +152,15 @@ internal sealed class FilterBar
         ], filter.Mode);
 
         // Highest first, so "the one I play" is at the top of the list as well as selected.
-        // Dread is the rung above A10, so a player who has played it opens on it.
+        // The pick is the highest rung the rest of the filter has runs at, and Dread is the
+        // rung above A10, so a player who has played it opens on it.
         _ascension.SetOptions(
             ascensions
                 .Select(level => new ComboBox.Option(Format.Ascension(level), level))
                 .Prepend(new ComboBox.Option(AllAscensions, null)),
             _ascensionChosen || !RunArchive.HasLoaded
                 ? filter.Ascension
-                : ascensions.Count > 0 ? ascensions[0] : null);
+                : filter.HighestAscension(RunArchive.Runs));
 
         _character.SetOptions(
             RunArchive.KnownCharacters()

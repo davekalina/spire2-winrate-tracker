@@ -84,7 +84,7 @@ public class HomePanelTests
         var loss = panel.RecentRuns[0];
         Assert.False(loss.Win);
         Assert.Equal("Ironclad", loss.Character);
-        Assert.Equal(10, loss.Ascension);
+        Assert.Equal(10, loss.Level);
         Assert.Equal("2026-08-24 · 22:00", loss.When);
         Assert.Equal("58 min", loss.Length);
         Assert.Equal("Killed by Queen Boss", loss.Outcome);
@@ -97,7 +97,7 @@ public class HomePanelTests
     }
 
     [Fact]
-    public void A_dread_runs_tip_says_dread()
+    public void A_dread_runs_tip_carries_the_dread_rung()
     {
         var runs = new List<RunRecord>
         {
@@ -106,8 +106,8 @@ public class HomePanelTests
         var report = WinrateReport.Build(runs);
 
         var run = Assert.Single(HomePanel.Build(report, report.Characters, null).RecentRuns);
-        Assert.True(run.Dread);
-        Assert.Equal("Dread · Act 2 · 31 floors", run.Detail);
+        Assert.Equal(RunRecord.DreadLevel, run.Level);
+        Assert.Equal("Act 2 · 31 floors", run.Detail);
     }
 
     /// <summary>
@@ -309,7 +309,7 @@ public class HomePanelTests
         var pip = Assert.Single(chip.RecentRuns);
 
         Assert.Equal("Ironclad", pip.Character);
-        Assert.Equal(10, pip.Ascension);
+        Assert.Equal(10, pip.Level);
         Assert.Equal("2026-08-24 · 22:00", pip.When);
         Assert.Equal("58 min", pip.Length);
         Assert.Equal("Killed by Queen Boss", pip.Outcome);
