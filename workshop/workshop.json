@@ -2,7 +2,7 @@
   "title": "Winrate Tracker",
   "description": "Winrate Tracker tracks your winrate over time!  Amazing!\n\nFeatures include:\n- Shows reports based on actual run history per-profile and per-ascension.\n- Calculates total winrate and splits (per-month, per-patch, per-10 game samples, per-50 game samples).\n- Per-character and time period filters.\n- Per-card and per-relic winrates.\n- Time of day splits (I'm better in the evening, which is odd!)\n- Charts and graphs!  They're not that exciting, really, but they exist.\n- Can optionally exclude floor 1 abandons.\n\nProject source on Github here:  https://github.com/davekalina/spire2-winrate-tracker\n\nWinrate Tracker currently works with version 0.113.0 on the beta branch only.",
   "visibility": "public",
-  "changeNote": "v1.7.0\n\n- Dread runs now have their own entry in the ascension filter, above A10. If you've played Dread, the screen opens on it.\n- Dread runs are no longer mixed into the win rate of whatever ascension number they were saved with.",
+  "changeNote": "v1.7.0\n\n- Dread runs now have their own entry in the ascension filter, above A10. If you've played Dread, the screen opens on it.\n- Dread runs are no longer mixed into the win rate of whatever ascension number they were saved with.\n- Run tooltips mark Dread runs with the game's own Dread icon.",
   "tags": [
     "Utility"
   ],
