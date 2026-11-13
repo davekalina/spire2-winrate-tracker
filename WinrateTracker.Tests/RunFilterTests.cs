@@ -106,6 +106,34 @@ public class RunFilterTests
     }
 
     [Fact]
+    public void The_highest_ascension_is_dread_once_a_dread_run_counts()
+    {
+        Assert.Equal(10, RunFilter.Default.HighestAscension(Archive));
+
+        var archive = new List<RunRecord>(Archive) { Run(Unix(2026, 1, 7), dread: true) };
+        Assert.Equal(RunRecord.DreadLevel, RunFilter.Default.HighestAscension(archive));
+    }
+
+    /// <summary>
+    /// The screen opens on this, so a Dread run the rest of the filter drops must not pull
+    /// it onto an empty Dread.
+    /// </summary>
+    [Fact]
+    public void The_highest_ascension_comes_from_runs_the_rest_of_the_filter_keeps()
+    {
+        var archive = new List<RunRecord>(Archive)
+        {
+            Run(Unix(2026, 1, 7), dread: true, playerCount: 2),
+            Run(Unix(2026, 1, 8), dread: true, abandoned: true, nodes: 1),
+            Run(Unix(2026, 1, 9), dread: true, character: "Regent"),
+        };
+
+        Assert.Equal(10, new RunFilter { Character = "Ironclad" }.HighestAscension(archive));
+        Assert.Equal(RunRecord.DreadLevel, new RunFilter { Mode = PlayerMode.Multiplayer }.HighestAscension(archive));
+        Assert.Null(new RunFilter { Character = "Necrobinder" }.HighestAscension(archive));
+    }
+
+    [Fact]
     public void A_character_narrows_to_that_character_only()
     {
         var runs = new RunFilter { Ascension = null, Character = "Silent" }.Apply(Archive);

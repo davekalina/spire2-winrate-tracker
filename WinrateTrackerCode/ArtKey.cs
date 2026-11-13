@@ -38,6 +38,12 @@ internal static class ArtKey
     /// <summary>The ascension flame, badged over a character icon in the run tip.</summary>
     public const string Ascension = "ascension";
 
+    /// <summary>
+    /// Dread's mark, badged in the flame's place on a Dread run: the game's own game-over
+    /// screen scores a Dread run with this icon rather than an ascension number.
+    /// </summary>
+    public const string Dread = "dread";
+
     /// <summary>A clock, beside how long a run took.</summary>
     public const string Clock = "clock";
 
