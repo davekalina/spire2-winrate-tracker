@@ -16,6 +16,10 @@ internal sealed record RunRecord
     /// <summary>Unix seconds. The game names the file after it, so it is also the sort key.</summary>
     public required long StartTime { get; init; }
 
+    /// <summary>
+    /// The ascension the file records. For a Dread run this is not where the run sits on
+    /// the ladder — see <see cref="Level" />, which is what filtering and grouping use.
+    /// </summary>
     public required int Ascension { get; init; }
     public required bool Win { get; init; }
     public required bool Abandoned { get; init; }
@@ -33,6 +37,26 @@ internal sealed record RunRecord
     /// ladder of its own. Not counted — see <see cref="RunFilter.Counts" />.
     /// </summary>
     public bool Blitz { get; init; }
+
+    /// <summary>
+    /// A run of the Dread mode added in game 0.113. Dread unlocks once every character has
+    /// beaten A10 and is played at one fixed difficulty, so it is filed as the rung above
+    /// A10 rather than under whatever ascension number the file carries.
+    /// </summary>
+    public bool Dread { get; init; }
+
+    /// <summary>
+    /// Where the run sits on the ascension ladder: its ascension, or
+    /// <see cref="DreadLevel" /> for a Dread run. The ascension filter, the ascension list,
+    /// and the screen's pick of the highest ascension played all read this.
+    /// </summary>
+    public int Level => Dread ? DreadLevel : Ascension;
+
+    /// <summary>
+    /// The ladder position of Dread: above any ascension, so it sorts to the top of the
+    /// ascension list and is what the screen opens on for a player who has played it.
+    /// </summary>
+    public const int DreadLevel = int.MaxValue;
 
     /// <summary>Map points entered across every act. The run's length.</summary>
     public required int Nodes { get; init; }

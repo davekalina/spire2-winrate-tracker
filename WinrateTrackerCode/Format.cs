@@ -43,6 +43,13 @@ internal static class Format
 
     public static string Count(int value) => value.ToString(CultureInfo.InvariantCulture);
 
+    /// <summary>
+    /// A rung of the ascension ladder as the game writes it: <c>A10</c>, or <c>Dread</c>
+    /// for <see cref="RunRecord.DreadLevel" />.
+    /// </summary>
+    public static string Ascension(int level) =>
+        level == RunRecord.DreadLevel ? "Dread" : $"A{Count(level)}";
+
     /// <summary>One decimal place, for averages.</summary>
     public static string Average(double value) => value.ToString("0.0", CultureInfo.InvariantCulture);
 

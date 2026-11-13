@@ -28,7 +28,12 @@ internal sealed record RunFilter
 
     public PlayerMode Mode { get; init; } = PlayerMode.Singleplayer;
 
-    /// <summary>Ascension to report on, or null for every ascension together.</summary>
+    /// <summary>
+    /// Ascension to report on, or null for every ascension together. Matched against
+    /// <see cref="RunRecord.Level" />, so <see cref="RunRecord.DreadLevel" /> selects Dread
+    /// runs and a plain number never does: a Dread result filed under A10 would be a
+    /// different difficulty's result under the same number, as with Blitz.
+    /// </summary>
     public int? Ascension { get; init; }
 
     /// <summary>Character display name to report on, or null for every character.</summary>
@@ -85,14 +90,15 @@ internal sealed record RunFilter
     /// archive — the ascension and character lists included — rather than offered as a
     /// filter.
     ///
-    /// Daily and custom runs have always been counted and still are.
+    /// Daily and custom runs have always been counted and still are. Dread runs are too,
+    /// as their own rung above A10 — see <see cref="RunRecord.Level" />.
     /// </summary>
     public static bool Counts(RunRecord run) => !run.Blitz;
 
     public bool Matches(RunRecord run) =>
         MatchesMode(run)
         && !(IgnoreEarlyAbandons && run.IsEarlyAbandon)
-        && (Ascension is null || run.Ascension == Ascension)
+        && (Ascension is null || run.Level == Ascension)
         && (Character is null || run.Character == Character);
 
     public bool MatchesMode(RunRecord run) => Mode switch

@@ -61,7 +61,10 @@ internal static class RunTipView
             portrait.AddChild(icon);
         }
 
-        portrait.AddChild(Badge(run.Ascension));
+        // A Dread run's file carries an ascension number that is not its difficulty, so it
+        // gets no number badge; the detail line says Dread instead.
+        if (!run.Dread)
+            portrait.AddChild(Badge(run.Ascension));
         return portrait;
     }
 

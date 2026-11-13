@@ -8,7 +8,8 @@ namespace WinrateTracker.WinrateTrackerCode;
 /// to look. It applies to every tab.
 ///
 /// Options come from the archive itself, so the ascension list only offers ascensions that
-/// have actually been played and the character list only characters that have been played.
+/// have actually been played — Dread among them, above A10, once a Dread run exists — and
+/// the character list only characters that have been played.
 /// </summary>
 internal sealed class FilterBar
 {
@@ -151,9 +152,10 @@ internal sealed class FilterBar
         ], filter.Mode);
 
         // Highest first, so "the one I play" is at the top of the list as well as selected.
+        // Dread is the rung above A10, so a player who has played it opens on it.
         _ascension.SetOptions(
             ascensions
-                .Select(ascension => new ComboBox.Option($"A{ascension}", ascension))
+                .Select(level => new ComboBox.Option(Format.Ascension(level), level))
                 .Prepend(new ComboBox.Option(AllAscensions, null)),
             _ascensionChosen || !RunArchive.HasLoaded
                 ? filter.Ascension

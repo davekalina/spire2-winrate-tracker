@@ -28,6 +28,9 @@ internal static class RunParser
     /// <summary>How a run file names the Blitz game mode (0.113 and later).</summary>
     private const string BlitzMode = "blitz";
 
+    /// <summary>How a run file names the Dread game mode (0.113 and later).</summary>
+    private const string DreadMode = "dread";
+
     /// <summary>
     /// Parse one run. Returns null for invalid data or an unidentified multiplayer player.
     /// </summary>
@@ -69,6 +72,7 @@ internal static class RunParser
             var win = ReadBoolean(root, "win");
             var killedBy = ReadString(root, "killed_by_encounter");
             var (patch, patchOrder) = PatchOf(ReadString(root, "build_id"));
+            var mode = ReadString(root, "game_mode");
 
             return new RunRecord
             {
@@ -82,7 +86,8 @@ internal static class RunParser
                 PickedRelics = ReadPicks(player, "relics"),
                 PlayerCount = playerCount,
                 RunTimeSeconds = ReadSingle(root, "run_time") ?? 0f,
-                Blitz = string.Equals(ReadString(root, "game_mode"), BlitzMode, StringComparison.OrdinalIgnoreCase),
+                Blitz = string.Equals(mode, BlitzMode, StringComparison.OrdinalIgnoreCase),
+                Dread = string.Equals(mode, DreadMode, StringComparison.OrdinalIgnoreCase),
                 Nodes = nodes,
                 ActReached = win ? 4 : Math.Max(1, actsEntered),
                 Elites = counts.Elites,

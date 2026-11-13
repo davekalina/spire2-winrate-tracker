@@ -79,4 +79,11 @@ public class FormatTests
         Assert.Equal("whenever", Format.MonthName("whenever"));
         Assert.Equal("whenever", Format.MonthAbbreviation("whenever"));
     }
+
+    [Theory]
+    [InlineData(0, "A0")]
+    [InlineData(10, "A10")]
+    [InlineData(RunRecord.DreadLevel, "Dread")]
+    public void Ascensions_read_as_the_game_writes_them(int level, string expected) =>
+        Assert.Equal(expected, Format.Ascension(level));
 }

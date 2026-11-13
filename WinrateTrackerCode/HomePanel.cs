@@ -30,11 +30,15 @@ internal enum Tone
 /// <param name="When">Date and clock time, e.g. <c>2026-08-24 · 22:12</c>.</param>
 /// <param name="Length">How long the run took, e.g. <c>58 min</c>.</param>
 /// <param name="Outcome">What ended it — <c>Killed by Queen Boss</c>, or <c>Run won</c>.</param>
-/// <param name="Detail">How far it got, e.g. <c>Act 3 · 44 floors</c>.</param>
+/// <param name="Dread">A Dread run, whose ascension number is not its difficulty: the tip
+/// leaves the ascension badge off and says <c>Dread</c> in <paramref name="Detail" />.</param>
+/// <param name="Detail">How far it got, e.g. <c>Act 3 · 44 floors</c>, or
+/// <c>Dread · Act 2 · 31 floors</c>.</param>
 internal sealed record RunSummary(
     bool Win,
     string Character,
     int Ascension,
+    bool Dread,
     string When,
     string Length,
     string Outcome,
@@ -51,12 +55,14 @@ internal sealed record RunSummary(
         run.Win,
         run.Character,
         run.Ascension,
+        run.Dread,
         $"{Format.Date(run.LocalStart)} · {run.LocalStart:HH:mm}",
         $"{Format.Minutes(run.RunTimeMinutes)} min",
         run.Win ? "Run won" : $"Killed by {Fallback(run.KilledBy, "something unrecorded")}",
-        run.Win
+        (run.Dread ? "Dread · " : "")
+        + (run.Win
             ? $"Act 3 cleared · {run.Nodes} floors"
-            : $"Act {run.ActReached} · {run.Nodes} floors");
+            : $"Act {run.ActReached} · {run.Nodes} floors"));
 
     private static string Fallback(string value, string ifEmpty) =>
         string.IsNullOrWhiteSpace(value) ? ifEmpty : value;
