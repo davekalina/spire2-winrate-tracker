@@ -184,7 +184,7 @@ internal static class RunArchive
 
     /// <summary>Every ascension present in the archive, highest first. Drives the filter.</summary>
     public static IReadOnlyList<int> KnownAscensions() =>
-        Runs.Select(run => run.Ascension).Distinct().OrderByDescending(ascension => ascension).ToList();
+        Runs.Select(run => run.Level).Distinct().OrderByDescending(level => level).ToList();
 
     /// <summary>Every character present in the archive, alphabetically. Drives the filter.</summary>
     public static IReadOnlyList<string> KnownCharacters() =>

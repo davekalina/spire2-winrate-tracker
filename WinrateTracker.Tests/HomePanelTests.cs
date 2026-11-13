@@ -96,6 +96,20 @@ public class HomePanelTests
         Assert.Equal("Act 3 cleared · 50 floors", win.Detail);
     }
 
+    [Fact]
+    public void A_dread_runs_tip_says_dread()
+    {
+        var runs = new List<RunRecord>
+        {
+            Run(Unix(2026, 8, 24, 22), dread: true, actReached: 2, nodes: 31),
+        };
+        var report = WinrateReport.Build(runs);
+
+        var run = Assert.Single(HomePanel.Build(report, report.Characters, null).RecentRuns);
+        Assert.True(run.Dread);
+        Assert.Equal("Dread · Act 2 · 31 floors", run.Detail);
+    }
+
     /// <summary>
     /// A run whose killer the file did not record still has to say something. "Killed by"
     /// with nothing after it reads as a bug in the mod rather than a gap in the save.

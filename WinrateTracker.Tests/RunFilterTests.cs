@@ -75,6 +75,37 @@ public class RunFilterTests
     }
 
     [Fact]
+    public void A_numbered_ascension_leaves_out_dread_runs_at_that_number()
+    {
+        var archive = new List<RunRecord>(Archive) { Run(Unix(2026, 1, 7), ascension: 10, dread: true) };
+
+        Assert.DoesNotContain(new RunFilter { Ascension = 10 }.Apply(archive), run => run.Dread);
+    }
+
+    [Fact]
+    public void Dread_narrows_to_dread_runs_only()
+    {
+        var archive = new List<RunRecord>(Archive)
+        {
+            Run(Unix(2026, 1, 7), ascension: 10, dread: true),
+            Run(Unix(2026, 1, 8), ascension: 0, dread: true, win: true),
+        };
+
+        var runs = new RunFilter { Ascension = RunRecord.DreadLevel }.Apply(archive);
+
+        Assert.Equal(2, runs.Count);
+        Assert.All(runs, run => Assert.True(run.Dread));
+    }
+
+    [Fact]
+    public void Every_ascension_together_includes_dread()
+    {
+        var archive = new List<RunRecord>(Archive) { Run(Unix(2026, 1, 7), dread: true) };
+
+        Assert.Contains(AllAscensions.Apply(archive), run => run.Dread);
+    }
+
+    [Fact]
     public void A_character_narrows_to_that_character_only()
     {
         var runs = new RunFilter { Ascension = null, Character = "Silent" }.Apply(Archive);

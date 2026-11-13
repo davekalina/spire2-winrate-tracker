@@ -20,6 +20,8 @@ The numbers come from the `.run` files the game already writes for every finishe
 nothing needs enabling first and runs from before you installed the mod are included.
 Blitz runs are left out: Blitz is a shorter game with its own ascension ladder, and its
 results would muddy the win rate at every ascension they share a number with.
+Dread runs are counted as their own entry in the ascension list, above A10, and the screen
+opens on Dread once you have played it.
 Reading them happens off the main thread and is cached, so the screen opens without a
 stutter.
 

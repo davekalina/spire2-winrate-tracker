@@ -222,17 +222,18 @@ public class RunParserTests
 
     [Theory]
     // v10 and earlier: custom runs were their own game mode.
-    [InlineData("\"game_mode\": \"standard\",", false)]
-    [InlineData("\"game_mode\": \"daily\",", false)]
-    [InlineData("\"game_mode\": \"custom\",", false)]
+    [InlineData("\"game_mode\": \"standard\",", false, false)]
+    [InlineData("\"game_mode\": \"daily\",", false, false)]
+    [InlineData("\"game_mode\": \"custom\",", false, false)]
     // v11 (game 0.113): custom is a flag beside the mode, and Blitz and Dread are new.
-    [InlineData("\"game_mode\": \"standard\", \"is_custom_game\": true,", false)]
-    [InlineData("\"game_mode\": \"dread\",", false)]
-    [InlineData("\"game_mode\": \"blitz\",", true)]
-    [InlineData("\"game_mode\": \"Blitz\",", true)]
-    // No mode at all: older than the field, and so not Blitz.
-    [InlineData("", false)]
-    public void Reads_whether_a_run_was_blitz(string modeFields, bool blitz)
+    [InlineData("\"game_mode\": \"standard\", \"is_custom_game\": true,", false, false)]
+    [InlineData("\"game_mode\": \"dread\",", false, true)]
+    [InlineData("\"game_mode\": \"Dread\",", false, true)]
+    [InlineData("\"game_mode\": \"blitz\",", true, false)]
+    [InlineData("\"game_mode\": \"Blitz\",", true, false)]
+    // No mode at all: older than the field, and so neither.
+    [InlineData("", false, false)]
+    public void Reads_whether_a_run_was_blitz_or_dread(string modeFields, bool blitz, bool dread)
     {
         var json = $$"""
         {
@@ -247,7 +248,34 @@ public class RunParserTests
         }
         """;
 
-        Assert.Equal(blitz, Parse(json).Blitz);
+        var run = Parse(json);
+        Assert.Equal(blitz, run.Blitz);
+        Assert.Equal(dread, run.Dread);
+    }
+
+    /// <summary>
+    /// A Dread run is filed above A10 whatever ascension its file carries, so filtering and
+    /// the ascension list never mix it in with a numbered ascension.
+    /// </summary>
+    [Fact]
+    public void A_dread_run_sits_above_every_ascension()
+    {
+        var json = """
+        {
+          "schema_version": 11,
+          "game_mode": "dread",
+          "win": false,
+          "start_time": 1785189461,
+          "ascension": 10,
+          "players": [{ "character": "CHARACTER.SILENT" }],
+          "map_point_history": []
+        }
+        """;
+
+        var run = Parse(json);
+        Assert.Equal(10, run.Ascension);
+        Assert.Equal(RunRecord.DreadLevel, run.Level);
+        Assert.True(RunFilter.Counts(run));
     }
 
     [Theory]

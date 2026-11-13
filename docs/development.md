@@ -68,7 +68,7 @@ but main was still 0.107.1, below `min_game_version`, so the mod was beta-only.)
    the new `sts2.dll`, and check every scene path, node path, texture, font, and loc table
    the mod names against the new `.pck`.
 4. Check the run-history schema (`RunHistory` and its migrations) for new fields or new
-   values of the ones `RunParser` reads. 0.113 took it to v11 and added the Blitz mode.
+   values of the ones `RunParser` reads. 0.113 took it to v11 and added the Blitz and Dread modes.
 
 ## Publish to the Steam Workshop
 

@@ -42,6 +42,11 @@ row (ascension, character, time window). One setting lives in Settings → Mod S
   archive — reports, streaks, and the ascension and character lists — the way a rule about
   what counts as a run should be applied. Daily and custom runs are still counted, as they
   always have been.
+- **Dread runs are a rung of their own, above A10.** Dread is one fixed difficulty, so
+  `RunRecord.Level` files it at `DreadLevel` whatever ascension number the file carries.
+  The ascension filter, the ascension list, and the open-on-the-highest default all read
+  `Level`. So Dread shows as its own entry, a numbered ascension never includes it, and a
+  player who has played Dread opens on it.
 - **One build serves every game version the manifest admits** — 0.111 and 0.113. Main is
   still 0.107.1, below `min_game_version`, so in practice the mod is beta-only (0.113)
   until Mega Crit promotes a newer build to main. Where builds differ, the call goes through `GameCompat` by name and takes whichever
