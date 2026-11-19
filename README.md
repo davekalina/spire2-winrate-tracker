@@ -30,7 +30,7 @@ Everything works with mouse and keyboard or with a gamepad.
 ## Installing
 
 Subscribe on the [Steam Workshop][workshop]. Requires Slay the Spire 2 v0.111 or newer,
-so for now that means v0.113 on the beta branch: the main branch is still v0.107.1.
+which covers both the main branch (v0.111.1) and the beta branch (v0.113.1).
 
 ## Building
 

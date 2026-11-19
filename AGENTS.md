@@ -47,9 +47,8 @@ row (ascension, character, time window). One setting lives in Settings → Mod S
   The ascension filter, the ascension list, and the open-on-the-highest default all read
   `Level`. So Dread shows as its own entry, a numbered ascension never includes it, and a
   player who has played Dread opens on it.
-- **One build serves every game version the manifest admits** — 0.111 and 0.113. Main is
-  still 0.107.1, below `min_game_version`, so in practice the mod is beta-only (0.113)
-  until Mega Crit promotes a newer build to main. Where builds differ, the call goes through `GameCompat` by name and takes whichever
+- **One build serves every game version the manifest admits** — 0.111 and 0.113. As of
+  2026-11-18 that is both branches: main is 0.111.1 and the beta is 0.113.1. Where builds differ, the call goes through `GameCompat` by name and takes whichever
   form the running game has; never call a member that differs between them directly. A
   direct call compiles against whichever `sts2.dll` is installed and then throws
   `MissingMethodException` on the other build, when the runtime compiles the *calling*
@@ -213,9 +212,10 @@ The `workshop/` directory is this mod's uploader workspace. See
   the changelog subscribers see.
 - Bump the manifest version and push to GitHub before uploading, so the
   published version always corresponds to a commit.
-- Keep the item limited to the branches the manifest can load on. While main is below
-  `min_game_version` (main is 0.107.1 as of 2026-11-12), the item stays **beta-only**: after
-  every upload, set the supported branch range to `public-beta` only on the item's change
-  notes page, because Steam attaches the range to each item version. Never set
-  `minBranch`/`maxBranch` in `workshop.json` (see `docs/sts2-modding.md`). The Workshop
-  description says the same: "works with version 0.113.0 on the beta branch only".
+- Keep the item open to every branch the manifest can load on. Since main reached 0.111.1
+  (2026-11-18) that is main and the beta alike, so the item's supported branch range has
+  no minimum and no maximum, which is what a new upload gets by default. Steam attaches
+  the range to each item version on its change notes page; if main ever falls below
+  `min_game_version` again, set the minimum to `public-beta` there after every upload.
+  Never set `minBranch`/`maxBranch` in `workshop.json` (see `docs/sts2-modding.md`). The
+  Workshop description says the same: "works on both the main branch ... and the beta branch".
