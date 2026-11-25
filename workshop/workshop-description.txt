@@ -11,4 +11,4 @@ Features include:
 
 Project source on Github here:  https://github.com/davekalina/spire2-winrate-tracker
 
-Winrate Tracker works on both the main branch (version 0.111.1) and the beta branch (version 0.113.1).
+Winrate Tracker works on both the main branch (version 0.111.1) and the beta branch (version 0.114.0).

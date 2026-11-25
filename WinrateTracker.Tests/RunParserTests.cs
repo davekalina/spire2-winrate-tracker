@@ -287,4 +287,28 @@ public class RunParserTests
     {
         Assert.Equal(key, ArtKey.Character(RunParser.CleanId(raw)));
     }
+
+    [Fact]
+    public void A_card_the_game_renamed_is_read_under_its_new_id()
+    {
+        // 0.114 renamed Rapid Shot to Twin Shot and migrates the id only in memory, so a
+        // file written on 0.113 still says RAPID_SHOT.
+        const string json = """
+        {
+          "start_time": 1785189461,
+          "win": true,
+          "players": [{
+            "character": "CHARACTER.FOOL",
+            "deck": [
+              { "id": "CARD.RAPID_SHOT", "floor_added_to_deck": 3 },
+              { "id": "CARD.TWIN_SHOT", "floor_added_to_deck": 7 },
+              { "id": "CARD.SCARE", "floor_added_to_deck": 4 }
+            ]
+          }],
+          "map_point_history": []
+        }
+        """;
+
+        Assert.Equal(["TWIN_SHOT", "SIDESTEP"], Parse(json).PickedCards);
+    }
 }

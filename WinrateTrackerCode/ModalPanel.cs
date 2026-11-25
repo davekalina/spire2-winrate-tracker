@@ -94,12 +94,14 @@ internal sealed class ModalPanel
         // B / Escape has to close the modal rather than the screen underneath it. The back
         // button binds the same hotkeys, so this is pushed onto the manager's stack while
         // the modal is up and removed the moment it closes — which is exactly how the
-        // game's own patch notes screen sits over the main menu.
+        // game's own patch notes screen sits over the main menu. The backdrop owns it:
+        // from 0.114 the newest binding whose owner is showing wins, and Remove needs the
+        // same owner back.
         modal._cancel = modal.Close;
         if (NHotkeyManager.Instance is { } hotkeys)
         {
             foreach (var hotkey in CancelHotkeys)
-                GameCompat.PushHotkeyReleasedBinding(hotkeys, hotkey, modal._cancel);
+                GameCompat.PushHotkeyReleasedBinding(hotkeys, hotkey, backdrop, modal._cancel);
         }
 
         // Focus lands on Close so a gamepad has somewhere to be, and so the modal owns
@@ -145,7 +147,7 @@ internal sealed class ModalPanel
             if (NHotkeyManager.Instance is { } hotkeys)
             {
                 foreach (var hotkey in CancelHotkeys)
-                    GameCompat.RemoveHotkeyReleasedBinding(hotkeys, hotkey, _cancel);
+                    GameCompat.RemoveHotkeyReleasedBinding(hotkeys, hotkey, _backdrop, _cancel);
             }
             _cancel = null;
         }

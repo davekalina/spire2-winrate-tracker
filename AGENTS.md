@@ -34,8 +34,10 @@ row (ascension, character, time window). One setting lives in Settings → Mod S
 - **The files are parsed by hand, not through `SaveManager.LoadRunHistory`.** That path
   runs save migrations and deserializes the whole run — deck, relics, every per-floor
   stat block — to answer a question that needs a dozen scalars. `RunParser` reads the raw
-  JSON instead. The archive already spans schema v8 through v11 and the fields it reads have
-  been stable across all of them.
+  JSON instead. The archive already spans schema v8 through v12 and the fields it reads have
+  been stable across all of them. What the parser skips with the migrations is the game's
+  card renames, which never reach the file on disk; `RunParser.RenamedIds` applies them
+  (0.114 renamed `CARD.RAPID_SHOT` to `CARD.TWIN_SHOT`).
 - **Blitz runs are not counted.** Game 0.113 added a Blitz mode: a handful of rooms per
   act and an ascension ladder of its own, so its runs would file a different game's
   results under the same ascension numbers. `RunFilter.Counts` drops them from the whole
@@ -47,15 +49,19 @@ row (ascension, character, time window). One setting lives in Settings → Mod S
   The ascension filter, the ascension list, and the open-on-the-highest default all read
   `Level`. So Dread shows as its own entry, a numbered ascension never includes it, and a
   player who has played Dread opens on it.
-- **One build serves every game version the manifest admits** — 0.111 and 0.113. As of
-  2026-11-18 that is both branches: main is 0.111.1 and the beta is 0.113.1. Where builds differ, the call goes through `GameCompat` by name and takes whichever
+- **One build serves every game version the manifest admits** — 0.111, 0.113 and 0.114.
+  As of 2026-11-25 that is both branches: main is 0.111.1 and the beta is 0.114.0. Where
+  builds differ, the call goes through `GameCompat` by name and takes whichever
   form the running game has; never call a member that differs between them directly. A
   direct call compiles against whichever `sts2.dll` is installed and then throws
   `MissingMethodException` on the other build, when the runtime compiles the *calling*
   method — so the whole method fails, and Godot logs it and carries on. The one known
   difference: `NHotkeyManager.Push/RemoveHotkeyReleasedBinding` (0.113 added a trailing
-  `long sequence = 0` to Push and made Remove return it), which `ComboBox` and
-  `ModalPanel` use to take Escape/B while open. See `docs/development.md` for how to check
+  `long sequence = 0` to Push and made Remove return it; 0.114 added a `Node owner` after
+  the hotkey), which `ComboBox` and `ModalPanel` use to take Escape/B while open.
+  `GameCompat` takes the owner and fills arguments by type; both pass their backdrop, the
+  same node to Push and Remove, because on 0.114 a binding fires only while its owner is
+  showing and Remove matches on owner and action. See `docs/development.md` for how to check
   the next game update.
 - **The screen is a second instance of the native Statistics screen**, contents replaced.
   It has to be a real `NSubmenu` to go on the submenu stack, and a mod assembly cannot

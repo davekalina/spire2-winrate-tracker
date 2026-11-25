@@ -11,11 +11,12 @@ namespace WinrateTracker.WinrateTrackerCode;
 /// <c>SaveManager.LoadRunHistory</c>. That path runs the save migration pipeline and
 /// deserializes the whole run — deck, relics, and every per-floor stat block — which is
 /// both far more work than a win rate needs and a source of failure on old files: the
-/// archive here spans schema v8 through v11, and older files still on disk migrate on every
+/// archive here spans schema v8 through v12, and older files still on disk migrate on every
 /// read. The fields below (result, ascension, character, room types) have been stable
 /// across those versions, so reading them directly is faster *and* survives more files.
 /// v11 (game 0.113) only moved custom runs from <c>game_mode: "custom"</c> to
-/// <c>is_custom_game</c>, and added the <c>blitz</c> and <c>dread</c> game modes.
+/// <c>is_custom_game</c>, and added the <c>blitz</c> and <c>dread</c> game modes. v12
+/// (game 0.114) only renamed a card id, which <see cref="RenamedIds" /> applies.
 ///
 /// Every field is optional. A file missing something yields a record with a default
 /// rather than an exception, and a file that will not parse at all yields null — one
@@ -175,12 +176,30 @@ internal static class RunParser
             if (ReadString(entry, "id") is not { Length: > 0 } id)
                 continue;
 
-            var name = StripPrefix(id);
+            var name = StripPrefix(RenamedIds.GetValueOrDefault(id, id));
             if (seen.Add(name))
                 picked.Add(Pool(name));
         }
         return picked;
     }
+
+    /// <summary>
+    /// Card ids the game has renamed, old to new, as its own save migrations list them
+    /// (<c>SharedMigrationHelper.v100Renames</c>, <c>v110Renames</c>, <c>v114Renames</c>).
+    /// The game renames an id when it loads a run file and never writes the file back, so a
+    /// file keeps the id it was written with, and a renamed card would otherwise count as
+    /// two cards — the older one with no name, art or rarity, since the game no longer
+    /// knows it.
+    ///
+    /// Always towards the new id. Main (0.111) has neither Rapid Shot nor Twin Shot, so that
+    /// one only matters on 0.114, which knows the card as Twin Shot.
+    /// </summary>
+    private static readonly Dictionary<string, string> RenamedIds = new(StringComparer.Ordinal)
+    {
+        ["CARD.PREPARE"] = "CARD.PREPARED",
+        ["CARD.SCARE"] = "CARD.SIDESTEP",
+        ["CARD.RAPID_SHOT"] = "CARD.TWIN_SHOT",
+    };
 
     /// <summary><c>CARD.SHIV</c> becomes <c>SHIV</c>, which is the key the game's own text tables use.</summary>
     private static string StripPrefix(string id)

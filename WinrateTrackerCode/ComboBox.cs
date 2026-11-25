@@ -312,12 +312,12 @@ internal sealed class ComboBox
         Emphasise(true);
 
         // B / Escape closes the list rather than the screen underneath it, for exactly as
-        // long as the list is up.
+        // long as the list is up. The backdrop owns the binding, for push and remove alike.
         _cancel = Close;
         if (NHotkeyManager.Instance is { } hotkeys)
         {
             foreach (var hotkey in CancelHotkeys)
-                GameCompat.PushHotkeyReleasedBinding(hotkeys, hotkey, _cancel);
+                GameCompat.PushHotkeyReleasedBinding(hotkeys, hotkey, _backdrop, _cancel);
         }
 
         // The cursor opens on what is already selected, so a pad can see where it is in the
@@ -458,10 +458,11 @@ internal sealed class ComboBox
     {
         if (_cancel is not null)
         {
-            if (NHotkeyManager.Instance is { } hotkeys)
+            // Open sets the backdrop before the binding, and only this clears either.
+            if (NHotkeyManager.Instance is { } hotkeys && _backdrop is not null)
             {
                 foreach (var hotkey in CancelHotkeys)
-                    GameCompat.RemoveHotkeyReleasedBinding(hotkeys, hotkey, _cancel);
+                    GameCompat.RemoveHotkeyReleasedBinding(hotkeys, hotkey, _backdrop, _cancel);
             }
             _cancel = null;
         }
